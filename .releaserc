@@ -6,5 +6,5 @@ plugins:
   - '@semantic-release/release-notes-generator'
   - '@semantic-release/npm'
 
-dryRun: true
-debug: true
+dryRun: false
+debug: false
