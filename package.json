@@ -146,5 +146,8 @@
     "piano",
     "guitar",
     "tablature"
-  ]
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
 }
