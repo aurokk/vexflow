@@ -1,3 +1,10 @@
+## [1.0.3](https://github.com/aurokk/vexflow/compare/v1.0.2...v1.0.3) (2025-10-06)
+
+
+### Bug Fixes
+
+* try fix build ([564d387](https://github.com/aurokk/vexflow/commit/564d387dd5834a0af0517ce4502b78434f2ed69b))
+
 ## [1.0.2](https://github.com/aurokk/vexflow/compare/v1.0.1...v1.0.2) (2025-10-05)
 
 
