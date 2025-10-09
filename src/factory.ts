@@ -41,6 +41,7 @@ import { StringNumber } from './stringnumber';
 import { System, SystemOptions } from './system';
 import { TabNote, TabNoteStruct } from './tabnote';
 import { TabStave } from './tabstave';
+import { ChordStave } from './chordstave';
 import { TextBracket } from './textbracket';
 import { TextDynamics } from './textdynamics';
 import { TextNote, TextNoteStruct } from './textnote';
@@ -217,6 +218,23 @@ export class Factory {
     };
 
     const stave = new TabStave(p.x, p.y, p.width, p.options);
+    this.staves.push(stave);
+    stave.setContext(this.context);
+    this.stave = stave;
+    return stave;
+  }
+
+  ChordStave(params?: { x?: number; y?: number; width?: number; options?: StaveOptions }): ChordStave {
+    const staveSpace = this.options.stave.space;
+    const p = {
+      x: 0,
+      y: 0,
+      width: this.options.renderer.width - staveSpace * 1.0,
+      options: { spacing_between_lines_px: staveSpace * 1.0 },
+      ...params,
+    };
+
+    const stave = new ChordStave(p.x, p.y, p.width, p.options);
     this.staves.push(stave);
     stave.setContext(this.context);
     this.stave = stave;

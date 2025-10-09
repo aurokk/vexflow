@@ -5,7 +5,7 @@
 
 import { TestOptions, VexFlowTests } from './vexflow_test_helpers';
 
-import { Renderer } from '../src';
+import { Renderer } from '../src/renderer';
 import { Barline, BarlineType } from '../src/stavebarline';
 
 const BarlineTests = {

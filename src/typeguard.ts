@@ -4,6 +4,7 @@
 
 import { Accidental } from './accidental';
 import { Annotation } from './annotation';
+import { ChordNote } from './chordnote';
 import { Dot } from './dot';
 import { GraceNote } from './gracenote';
 import { GraceNoteGroup } from './gracenotegroup';
@@ -55,6 +56,7 @@ export function isCategory<T>(obj: any, category: string, checkAncestors: boolea
 export const isAccidental = (obj: unknown): obj is Accidental => isCategory(obj, Category.Accidental);
 export const isAnnotation = (obj: unknown): obj is Annotation => isCategory(obj, Category.Annotation);
 export const isBarline = (obj: unknown): obj is Barline => isCategory(obj, Category.Barline);
+export const isChordNote = (obj: unknown): obj is ChordNote => isCategory(obj, Category.ChordNote);
 export const isDot = (obj: unknown): obj is Dot => isCategory(obj, Category.Dot);
 export const isGraceNote = (obj: unknown): obj is GraceNote => isCategory(obj, Category.GraceNote);
 export const isGraceNoteGroup = (obj: unknown): obj is GraceNoteGroup => isCategory(obj, Category.GraceNoteGroup);
@@ -74,6 +76,8 @@ export const enum Category {
   BarNote = 'BarNote',
   Beam = 'Beam',
   Bend = 'Bend',
+  ChordNote = 'ChordNote',
+  ChordStave = 'ChordStave',
   ChordSymbol = 'ChordSymbol',
   Clef = 'Clef',
   ClefNote = 'ClefNote',

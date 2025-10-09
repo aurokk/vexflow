@@ -24,6 +24,8 @@ export * from './barline_tests';
 export * from './beam_tests';
 export * from './bend_tests';
 export * from './boundingbox_tests';
+export * from './chordnote_tests';
+export * from './chordstave_tests';
 export * from './chordsymbol_tests';
 export * from './clef_tests';
 export * from './crossbeam_tests';

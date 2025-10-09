@@ -10,6 +10,8 @@ export * from './bend';
 export * from './boundingbox';
 export * from './boundingboxcomputation';
 export * from './canvascontext';
+export * from './chordnote';
+export * from './chordstave';
 export * from './chordsymbol';
 export * from './clef';
 export * from './clefnote';

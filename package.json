@@ -137,7 +137,9 @@
     "test:reference:cache": "grunt test:reference:cache",
     "generate:current": "grunt generate:current",
     "generate:reference": "grunt generate:reference",
-    "diff:reference": "grunt diff:reference"
+    "diff:reference": "grunt diff:reference",
+    "clean:build": "grunt clean:build",
+    "webpack:watchDebug": "grunt webpack:watchDebug"
   },
   "homepage": "https://vexflow.com/",
   "keywords": [
