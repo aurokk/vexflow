@@ -4,12 +4,13 @@
 // It uses the same chord rendering logic as ChordSymbol but as a standalone note.
 
 import { BoundingBox } from './boundingbox';
+import { ChordStave } from './chordstave';
 import { Font, FontInfo, FontStyle, FontWeight } from './font';
 import { Glyph } from './glyph';
 import { Note, NoteStruct } from './note';
 import { Tables } from './tables';
 import { TextFormatter } from './textformatter';
-import { Category } from './typeguard';
+import { Category, isChordStave } from './typeguard';
 import { RuntimeError } from './util';
 
 export interface ChordBlock {
@@ -98,7 +99,7 @@ export class ChordNote extends Note {
     }
     return {
       family,
-      size: 12,
+      size: 20,
       weight: FontWeight.NORMAL,
       style: FontStyle.NORMAL,
     };
@@ -197,6 +198,66 @@ export class ChordNote extends Note {
     // Note properties
     this.ignore_ticks = this.options.ignoreTicks;
     this.resetFont();
+  }
+
+  /**
+   * Override setStave to validate that only ChordStave instances are used.
+   * ChordNote can only be rendered on ChordStave, not on regular Stave or its subclasses.
+   * @throws RuntimeError if the provided stave is not a ChordStave
+   */
+  setStave(stave: any): this {
+    if (!isChordStave(stave)) {
+      throw new RuntimeError(
+        'InvalidStaveType',
+        'ChordNote can only be attached to ChordStave instances. Use ChordStave instead of Stave.'
+      );
+    }
+    // Store in parent's stave field but as ChordStave type
+    // TypeScript sees it as Stave, but at runtime it's a ChordStave
+    this.stave = stave as any;
+    this.setContext(stave.getContext());
+    return this;
+  }
+
+  /**
+   * Get the ChordStave attached to this note.
+   * @returns the ChordStave attached to this note
+   */
+  getChordStave(): ChordStave | undefined {
+    return this.stave as any as ChordStave;
+  }
+
+  /**
+   * Check and get the ChordStave attached to this note.
+   * @throws RuntimeError if no ChordStave is attached
+   */
+  checkChordStave(): ChordStave {
+    const stave = this.checkStave();
+    if (!isChordStave(stave)) {
+      throw new RuntimeError(
+        'InvalidStaveType',
+        'ChordNote requires a ChordStave, but a different stave type was attached.'
+      );
+    }
+    return stave as any as ChordStave;
+  }
+
+  /**
+   * Override getAbsoluteX to work with ChordStave which doesn't have getNoteStartX.
+   * For ChordStave, notes start at the stave's X position (no complex formatting).
+   */
+  getAbsoluteX(): number {
+    const tickContext = this.checkTickContext(`Can't getAbsoluteX() without a TickContext.`);
+    let x = tickContext.getX();
+    const chordStave = this.getChordStave();
+    if (chordStave) {
+      // ChordStave doesn't have getNoteStartX - just use the stave's X position
+      x += chordStave.getX();
+    }
+    if (this.isCenterAligned()) {
+      x += this.getCenterXShift();
+    }
+    return x;
   }
 
   /** Add a symbol block to this chord. */
@@ -421,8 +482,9 @@ export class ChordNote extends Note {
 
   getBoundingBox(): BoundingBox | undefined {
     const width = this.getWidth();
-    if (this.stave) {
-      const y = this.stave.getYForLine(this.options.line);
+    const chordStave = this.getChordStave();
+    if (chordStave) {
+      const y = chordStave.getYForLine(this.options.line);
       return new BoundingBox(this.getAbsoluteX(), y - 20, width, 40);
     }
     return undefined;
@@ -454,14 +516,18 @@ export class ChordNote extends Note {
   }
 
   draw(): void {
-    const stave = this.checkStave();
-    const ctx = stave.checkContext();
+    const chordStave = this.checkChordStave();
+    const ctx = chordStave.checkContext();
     this.setRendered();
     this.applyStyle(ctx);
     ctx.openGroup('chordNote', this.getAttribute('id'));
 
     const x = this.isCenterAligned() ? this.getAbsoluteX() - this.getWidth() / 2 : this.getAbsoluteX();
-    const y = stave.getYForLine(this.options.line);
+    // Use getCenterY if available and line is 2 (default middle), otherwise use getYForLine
+    const baseY =
+      this.options.line === 2 && 'getCenterY' in chordStave
+        ? (chordStave as any).getCenterY()
+        : chordStave.getYForLine(this.options.line);
 
     // Render the chord blocks
     ctx.save();
@@ -469,6 +535,9 @@ export class ChordNote extends Note {
     ctx.setFont(textFont);
 
     const fontSize = this.textFormatter.fontSizeInPixels;
+    // Offset to center text vertically (baseline is typically around 0.75 of font height from top)
+    const verticalCenterOffset = fontSize * 0.3;
+    const y = baseY + verticalCenterOffset;
     const fontAdj = Font.scaleSize(fontSize, 0.05);
     const glyphAdj = fontAdj * 2;
 

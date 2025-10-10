@@ -5,6 +5,7 @@
 import { Accidental } from './accidental';
 import { Annotation } from './annotation';
 import { ChordNote } from './chordnote';
+import { ChordStave } from './chordstave';
 import { Dot } from './dot';
 import { GraceNote } from './gracenote';
 import { GraceNoteGroup } from './gracenotegroup';
@@ -57,6 +58,7 @@ export const isAccidental = (obj: unknown): obj is Accidental => isCategory(obj,
 export const isAnnotation = (obj: unknown): obj is Annotation => isCategory(obj, Category.Annotation);
 export const isBarline = (obj: unknown): obj is Barline => isCategory(obj, Category.Barline);
 export const isChordNote = (obj: unknown): obj is ChordNote => isCategory(obj, Category.ChordNote);
+export const isChordStave = (obj: unknown): obj is ChordStave => isCategory(obj, Category.ChordStave);
 export const isDot = (obj: unknown): obj is Dot => isCategory(obj, Category.Dot);
 export const isGraceNote = (obj: unknown): obj is GraceNote => isCategory(obj, Category.GraceNote);
 export const isGraceNoteGroup = (obj: unknown): obj is GraceNoteGroup => isCategory(obj, Category.GraceNoteGroup);
