@@ -1,3 +1,10 @@
+# [1.1.0](https://github.com/aurokk/vexflow/compare/v1.0.3...v1.1.0) (2025-10-10)
+
+
+### Features
+
+* add chordnote & chordstave ([#1](https://github.com/aurokk/vexflow/issues/1)) ([b0fe098](https://github.com/aurokk/vexflow/commit/b0fe098a30c68afead3165bde6797e88b673b74a))
+
 ## [1.0.3](https://github.com/aurokk/vexflow/compare/v1.0.2...v1.0.3) (2025-10-06)
 
 
