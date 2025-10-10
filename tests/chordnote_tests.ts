@@ -31,7 +31,7 @@ function basic(options: any): void {
 
   const voice = f.Voice().setStrict(false).addTickables([chordNote]);
 
-  f.Formatter().joinVoices([voice]).formatToStave([voice], stave);
+  f.Formatter().joinVoices([voice]).format([voice], 500);
   f.draw();
 
   options.assert.ok(true, 'ChordNote renders successfully');
@@ -56,7 +56,7 @@ function multipleChords(options: any): void {
 
   const voice = f.Voice().setStrict(false).addTickables([chordNote1, chordNote2, chordNote3]);
 
-  f.Formatter().joinVoices([voice]).formatToStave([voice], stave);
+  f.Formatter().joinVoices([voice]).format([voice], 500);
   f.draw();
 
   options.assert.ok(true, 'Multiple ChordNotes render successfully');
@@ -78,7 +78,7 @@ function differentPositions(options: any): void {
 
   const voice = f.Voice().setStrict(false).addTickables([chordNote1, chordNote2, chordNote3]);
 
-  f.Formatter().joinVoices([voice]).formatToStave([voice], stave);
+  f.Formatter().joinVoices([voice]).format([voice], 500);
   f.draw();
 
   options.assert.ok(true, 'ChordNotes at different positions render successfully');
@@ -109,7 +109,7 @@ function complexChords(options: any): void {
 
   const voice = f.Voice().setStrict(false).addTickables([chordNote1, chordNote2, chordNote3, chordNote4]);
 
-  f.Formatter().joinVoices([voice]).formatToStave([voice], stave);
+  f.Formatter().joinVoices([voice]).format([voice], 500);
   f.draw();
 
   options.assert.ok(true, 'Complex ChordNotes render successfully');
@@ -142,7 +142,7 @@ function overBarNotation(options: any): void {
 
   const voice = f.Voice().setStrict(false).addTickables([chordNote1, chordNote2, chordNote3]);
 
-  f.Formatter().joinVoices([voice]).formatToStave([voice], stave);
+  f.Formatter().joinVoices([voice]).format([voice], 500);
   f.draw();
 
   options.assert.ok(true, 'Over bar notation ChordNotes render successfully');
