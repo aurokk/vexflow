@@ -3,8 +3,7 @@
   "env": { "browser": true, "node": true },
   "parser": "@typescript-eslint/parser",
   "parserOptions": {
-    "project": "tsconfig.json",
-    "extraFileExtensions": [".mjs"]
+    "project": "tsconfig.json"
   },
   "plugins": ["@typescript-eslint", "prettier", "simple-import-sort", "import"],
   "rules": {
@@ -44,6 +43,32 @@
             ]
           }
         ]
+      }
+    },
+    {
+      // Config files in root directory don't need project references
+      "files": ["*.config.ts", "*.config.js"],
+      "parserOptions": {
+        "project": null
+      },
+      "extends": ["eslint:recommended", "prettier"],
+      "rules": {
+        "no-console": "off"
+      }
+    },
+    {
+      // Vitest test files - don't need project references
+      "files": ["tests-vitest/**/*.ts"],
+      "parserOptions": {
+        "project": null
+      },
+      "extends": ["eslint:recommended", "prettier"],
+      "rules": {
+        "no-console": "off",
+        "no-unused-vars": "off",
+        "@typescript-eslint/no-unused-vars": "off",
+        "@typescript-eslint/no-explicit-any": "off",
+        "@typescript-eslint/no-non-null-assertion": "off"
       }
     },
     {
