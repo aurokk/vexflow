@@ -3,16 +3,17 @@
 //
 // Auto Beaming Tests - Vitest Version
 
-import { afterAll, beforeAll, describe, test } from 'vitest';
+import { describe, test } from 'vitest';
 
 import { Beam } from '../src/beam';
 import { EasyScore } from '../src/easyscore';
 import { Flow } from '../src/flow';
 import { Fraction } from '../src/fraction';
+import { Renderer, ContextBuilder } from '../src/renderer';
 import { Stave } from '../src/stave';
 import { Stem } from '../src/stem';
 import { StemmableNote } from '../src/stemmablenote';
-import { createAssert, FONT_STACKS, makeFactory, TestOptions } from './vitest_test_helpers';
+import { createAssert, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
 
 // Helper to flatten arrays
 const concat = <T>(a: T[], b: T[]): T[] => a.concat(b);
@@ -27,32 +28,43 @@ function createShortcuts(score: EasyScore) {
   };
 }
 
-/**
- * Helper to create a unique element ID and DOM element for testing
- */
-function createTestElement() {
-  const elementId = 'test_' + Date.now() + '_' + Math.random();
-  const element = document.createElement('canvas');
-  element.id = elementId;
-  document.body.appendChild(element);
-  return elementId;
-}
-
 describe('Auto-Beaming', () => {
-  let originalFontNames: string[];
+  function runTest(
+    testName: string,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    backends: Array<{ backend: number; fontStacks: string[] }> = [
+      { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
+      { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
+    ]
+  ) {
+    backends.forEach(({ backend, fontStacks }) => {
+      fontStacks.forEach((fontStackName) => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+          const elementId = generateTestID('auto_beam_test');
+          const tagName = backend === Renderer.Backends.SVG ? 'div' : 'canvas';
+          const element = document.createElement(tagName);
+          element.id = elementId;
+          document.body.appendChild(element);
 
-  beforeAll(async () => {
-    originalFontNames = Flow.getMusicFont();
-    Flow.setMusicFont(...FONT_STACKS['Bravura']);
-  });
+          const options: TestOptions = { elementId, params: {}, backend };
+          const originalFontNames = Flow.getMusicFont();
+          Flow.setMusicFont(...FONT_STACKS[fontStackName]);
 
-  afterAll(() => {
-    Flow.setMusicFont(...originalFontNames);
-  });
+          try {
+            const contextBuilder: ContextBuilder =
+              backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
+            testFunc(options, contextBuilder);
+          } finally {
+            Flow.setMusicFont(...originalFontNames);
+          }
+        });
+      });
+    });
+  }
 
-  test('Simple Auto Beaming - Canvas - Bravura', () => {
+  runTest('Simple Auto Beaming', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 450, 140);
+    const f = makeFactory(options.backend, options.elementId, 450, 140);
     const stave = f.Stave();
     const score = f.EasyScore();
 
@@ -71,9 +83,9 @@ describe('Auto-Beaming', () => {
     assert.ok(true, 'Auto Beaming Applicator Test');
   });
 
-  test('Auto Beaming With Overflow Group - Canvas - Bravura', () => {
+  runTest('Auto Beaming With Overflow Group', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 450, 140);
+    const f = makeFactory(options.backend, options.elementId, 450, 140);
     const stave = f.Stave();
     const score = f.EasyScore();
 
@@ -92,9 +104,9 @@ describe('Auto-Beaming', () => {
     assert.ok(true, 'Auto Beaming Applicator Test');
   });
 
-  test('Even Group Stem Directions - Canvas - Bravura', () => {
+  runTest('Even Group Stem Directions', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 450, 140);
+    const f = makeFactory(options.backend, options.elementId, 450, 140);
     const stave = f.Stave();
     const score = f.EasyScore();
 
@@ -118,9 +130,9 @@ describe('Auto-Beaming', () => {
     assert.ok(true, 'Auto Beaming Applicator Test');
   });
 
-  test('Odd Group Stem Directions - Canvas - Bravura', () => {
+  runTest('Odd Group Stem Directions', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 450, 140);
+    const f = makeFactory(options.backend, options.elementId, 450, 140);
     const stave = f.Stave();
     const score = f.EasyScore();
 
@@ -145,9 +157,9 @@ describe('Auto-Beaming', () => {
     assert.ok(true, 'Auto Beaming Applicator Test');
   });
 
-  test('Odd Beam Groups Auto Beaming - Canvas - Bravura', () => {
+  runTest('Odd Beam Groups Auto Beaming', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 450, 140);
+    const f = makeFactory(options.backend, options.elementId, 450, 140);
     const stave = f.Stave();
     const score = f.EasyScore();
 
@@ -166,9 +178,9 @@ describe('Auto-Beaming', () => {
     assert.ok(true, 'Auto Beam Applicator Test');
   });
 
-  test('More Simple Auto Beaming 0 - Canvas - Bravura', () => {
+  runTest('More Simple Auto Beaming 0', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 450, 140);
+    const f = makeFactory(options.backend, options.elementId, 450, 140);
     const stave = f.Stave();
     const score = f.EasyScore();
 
@@ -185,9 +197,9 @@ describe('Auto-Beaming', () => {
     assert.ok(true, 'Auto Beam Applicator Test');
   });
 
-  test('More Simple Auto Beaming 1 - Canvas - Bravura', () => {
+  runTest('More Simple Auto Beaming 1', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 450, 140);
+    const f = makeFactory(options.backend, options.elementId, 450, 140);
     const stave = f.Stave();
     const score = f.EasyScore();
 
@@ -207,9 +219,9 @@ describe('Auto-Beaming', () => {
     assert.ok(true, 'Auto Beam Applicator Test');
   });
 
-  test('Beam Across All Rests - Canvas - Bravura', () => {
+  runTest('Beam Across All Rests', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 450, 140);
+    const f = makeFactory(options.backend, options.elementId, 450, 140);
     const stave = f.Stave();
     const score = f.EasyScore();
 
@@ -231,9 +243,9 @@ describe('Auto-Beaming', () => {
     assert.ok(true, 'Auto Beam Applicator Test');
   });
 
-  test('Beam Across All Rests with Stemlets - Canvas - Bravura', () => {
+  runTest('Beam Across All Rests with Stemlets', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 450, 140);
+    const f = makeFactory(options.backend, options.elementId, 450, 140);
     const stave = f.Stave();
     const score = f.EasyScore();
 
@@ -256,9 +268,9 @@ describe('Auto-Beaming', () => {
     assert.ok(true, 'Auto Beam Applicator Test');
   });
 
-  test('Break Beams on Middle Rests Only - Canvas - Bravura', () => {
+  runTest('Break Beams on Middle Rests Only', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 450, 140);
+    const f = makeFactory(options.backend, options.elementId, 450, 140);
     const stave = f.Stave();
     const score = f.EasyScore();
 
@@ -281,9 +293,9 @@ describe('Auto-Beaming', () => {
     assert.ok(true, 'Auto Beam Applicator Test');
   });
 
-  test('Break Beams on Rest - Canvas - Bravura', () => {
+  runTest('Break Beams on Rest', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 450, 140);
+    const f = makeFactory(options.backend, options.elementId, 450, 140);
     const stave = f.Stave();
     const score = f.EasyScore();
 
@@ -305,9 +317,9 @@ describe('Auto-Beaming', () => {
     assert.ok(true, 'Auto Beam Applicator Test');
   });
 
-  test('Maintain Stem Directions - Canvas - Bravura', () => {
+  runTest('Maintain Stem Directions', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 450, 200);
+    const f = makeFactory(options.backend, options.elementId, 450, 200);
     const stave = f.Stave();
     const score = f.EasyScore();
 
@@ -338,9 +350,9 @@ describe('Auto-Beaming', () => {
     assert.ok(true, 'Auto Beam Applicator Test');
   });
 
-  test('Maintain Stem Directions - Beam Over Rests - Canvas - Bravura', () => {
+  runTest('Maintain Stem Directions - Beam Over Rests', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 450, 200);
+    const f = makeFactory(options.backend, options.elementId, 450, 200);
     const stave = f.Stave();
     const score = f.EasyScore();
 
@@ -371,9 +383,9 @@ describe('Auto-Beaming', () => {
     assert.ok(true, 'Auto Beam Applicator Test');
   });
 
-  test('Beat group with unbeamable note - 2/2 - Canvas - Bravura', () => {
+  runTest('Beat group with unbeamable note - 2/2', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 450, 200);
+    const f = makeFactory(options.backend, options.elementId, 450, 200);
     const stave = f.Stave().addTimeSignature('2/4');
     const score = f.EasyScore();
 
@@ -394,9 +406,9 @@ describe('Auto-Beaming', () => {
     assert.ok(true, 'Auto Beam Applicator Test');
   });
 
-  test('Offset beat grouping - 6/8 - Canvas - Bravura', () => {
+  runTest('Offset beat grouping - 6/8 ', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 450, 200);
+    const f = makeFactory(options.backend, options.elementId, 450, 200);
     const stave = f.Stave().addTimeSignature('6/8');
     const score = f.EasyScore();
 
@@ -417,9 +429,9 @@ describe('Auto-Beaming', () => {
     assert.ok(true, 'Auto Beam Applicator Test');
   });
 
-  test('Odd Time - Guessing Default Beam Groups - Canvas - Bravura', () => {
+  runTest('Odd Time - Guessing Default Beam Groups', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 450, 400);
+    const f = makeFactory(options.backend, options.elementId, 450, 400);
     const score = f.EasyScore();
 
     const stave1 = f.Stave({ y: 10 }).addTimeSignature('5/4');
@@ -449,9 +461,9 @@ describe('Auto-Beaming', () => {
     assert.ok(true, 'Auto Beam Applicator Test');
   });
 
-  test('Custom Beam Groups - Canvas - Bravura', () => {
+  runTest('Custom Beam Groups', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 450, 400);
+    const f = makeFactory(options.backend, options.elementId, 450, 400);
     const score = f.EasyScore();
 
     const stave1 = f.Stave({ y: 10 }).addTimeSignature('5/4');
@@ -485,9 +497,9 @@ describe('Auto-Beaming', () => {
     assert.ok(true, 'Auto Beam Applicator Test');
   });
 
-  test('Simple Tuplet Auto Beaming - Canvas - Bravura', () => {
+  runTest('Simple Tuplet Auto Beaming', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 450, 140);
+    const f = makeFactory(options.backend, options.elementId, 450, 140);
     const stave = f.Stave();
     const score = f.EasyScore();
 
@@ -513,9 +525,9 @@ describe('Auto-Beaming', () => {
     assert.ok(true, 'Auto Beam Applicator Test');
   });
 
-  test('More Simple Tuplet Auto Beaming - Canvas - Bravura', () => {
+  runTest('More Simple Tuplet Auto Beaming', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 450, 140);
+    const f = makeFactory(options.backend, options.elementId, 450, 140);
     const stave = f.Stave();
     const score = f.EasyScore();
 
@@ -536,9 +548,9 @@ describe('Auto-Beaming', () => {
     assert.ok(true, 'Auto Beam Applicator Test');
   });
 
-  test('More Automatic Beaming - Canvas - Bravura', () => {
+  runTest('More Automatic Beaming', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 450, 140);
+    const f = makeFactory(options.backend, options.elementId, 450, 140);
     const stave = f.Stave();
     const score = f.EasyScore();
 
@@ -557,9 +569,9 @@ describe('Auto-Beaming', () => {
     assert.ok(true, 'Auto Beam Applicator Test');
   });
 
-  test('Automatic Beaming 4/4 with 3, 3, 2 Pattern - Canvas - Bravura', () => {
+  runTest('Automatic Beaming 4/4 with  3, 3, 2 Pattern', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 450, 140);
+    const f = makeFactory(options.backend, options.elementId, 450, 140);
     const stave = f.Stave();
     const score = f.EasyScore();
 
@@ -576,9 +588,9 @@ describe('Auto-Beaming', () => {
     assert.ok(true, 'Auto Beam Applicator Test');
   });
 
-  test('Automatic Beaming 4/4 with 3, 3, 2 Pattern and Overflow - Canvas - Bravura', () => {
+  runTest('Automatic Beaming 4/4 with  3, 3, 2 Pattern and Overflow', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 450, 140);
+    const f = makeFactory(options.backend, options.elementId, 450, 140);
     const stave = f.Stave();
     const score = f.EasyScore();
 
@@ -595,9 +607,9 @@ describe('Auto-Beaming', () => {
     assert.ok(true, 'Auto Beam Applicator Test');
   });
 
-  test('Automatic Beaming 8/4 with 3, 2, 3 Pattern and 2 Overflows - Canvas - Bravura', () => {
+  runTest('Automatic Beaming 8/4 with  3, 2, 3 Pattern and 2 Overflows', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 450, 140);
+    const f = makeFactory(options.backend, options.elementId, 450, 140);
     const stave = f.Stave();
     const score = f.EasyScore();
 
@@ -619,9 +631,9 @@ describe('Auto-Beaming', () => {
     assert.ok(true, 'Auto Beam Applicator Test');
   });
 
-  test('Automatic Beaming 8/4 with 3, 2, 3 Pattern and 3 Overflows - Canvas - Bravura', () => {
+  runTest('Automatic Beaming 8/4 with  3, 2, 3 Pattern and 3 Overflows', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 450, 140);
+    const f = makeFactory(options.backend, options.elementId, 450, 140);
     const stave = f.Stave();
     const score = f.EasyScore();
 
@@ -638,9 +650,9 @@ describe('Auto-Beaming', () => {
     assert.ok(true, 'Auto Beam Applicator Test');
   });
 
-  test('Duration-Based Secondary Beam Breaks - Canvas - Bravura', () => {
+  runTest('Duration-Based Secondary Beam Breaks', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 450, 140);
+    const f = makeFactory(options.backend, options.elementId, 450, 140);
     const stave = f.Stave();
     const score = f.EasyScore();
 
@@ -666,9 +678,9 @@ describe('Auto-Beaming', () => {
     assert.ok(true, 'Duration-Based Secondary Breaks Test');
   });
 
-  test('Duration-Based Secondary Beam Breaks 2 - Canvas - Bravura', () => {
+  runTest('Duration-Based Secondary Beam Breaks 2', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 450, 140);
+    const f = makeFactory(options.backend, options.elementId, 450, 140);
     const stave = f.Stave();
     const score = f.EasyScore();
 
@@ -697,9 +709,9 @@ describe('Auto-Beaming', () => {
     assert.ok(true, 'Duration-Based Secondary Breaks Test');
   });
 
-  test('Flat Beams Up - Canvas - Bravura', () => {
+  runTest('Flat Beams Up', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 450, 140);
+    const f = makeFactory(options.backend, options.elementId, 450, 140);
     const stave = f.Stave({ y: 40 });
     const score = f.EasyScore();
 
@@ -728,9 +740,9 @@ describe('Auto-Beaming', () => {
     assert.ok(true, 'Flat Beams Up Test');
   });
 
-  test('Flat Beams Down - Canvas - Bravura', () => {
+  runTest('Flat Beams Down', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 450, 200);
+    const f = makeFactory(options.backend, options.elementId, 450, 200);
     const stave = f.Stave({ y: 40 });
     const score = f.EasyScore();
 
@@ -754,9 +766,9 @@ describe('Auto-Beaming', () => {
     assert.ok(true, 'Flat Beams Down Test');
   });
 
-  test('Flat Beams Mixed Direction - Canvas - Bravura', () => {
+  runTest('Flat Beams Mixed Direction', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 450, 200);
+    const f = makeFactory(options.backend, options.elementId, 450, 200);
     const stave = f.Stave({ y: 40 });
     const score = f.EasyScore();
 
@@ -777,9 +789,9 @@ describe('Auto-Beaming', () => {
     assert.ok(true, 'Flat Beams Mixed Direction Test');
   });
 
-  test('Flat Beams Up (uniform) - Canvas - Bravura', () => {
+  runTest('Flat Beams Up (uniform)', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 450, 140);
+    const f = makeFactory(options.backend, options.elementId, 450, 140);
     const stave = f.Stave({ y: 40 });
     const score = f.EasyScore();
 
@@ -805,9 +817,9 @@ describe('Auto-Beaming', () => {
     assert.ok(true, 'Flat Beams Up (uniform) Test');
   });
 
-  test('Flat Beams Down (uniform) - Canvas - Bravura', () => {
+  runTest('Flat Beams Down (uniform)', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 450, 200);
+    const f = makeFactory(options.backend, options.elementId, 450, 200);
     const stave = f.Stave({ y: 40 });
     const score = f.EasyScore();
 
@@ -832,9 +844,9 @@ describe('Auto-Beaming', () => {
     assert.ok(true, 'Flat Beams Down (uniform) Test');
   });
 
-  test('Flat Beams Up Bounds - Canvas - Bravura', () => {
+  runTest('Flat Beams Up Bounds', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 450, 140);
+    const f = makeFactory(options.backend, options.elementId, 450, 140);
     const stave = f.Stave({ y: 40 });
     const score = f.EasyScore();
 
@@ -860,9 +872,9 @@ describe('Auto-Beaming', () => {
     assert.ok(true, 'Flat Beams Up (uniform) Test');
   });
 
-  test('Flat Beams Down Bounds - Canvas - Bravura', () => {
+  runTest('Flat Beams Down Bounds', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 450, 200);
+    const f = makeFactory(options.backend, options.elementId, 450, 200);
     const stave = f.Stave({ y: 40 });
     const score = f.EasyScore();
 

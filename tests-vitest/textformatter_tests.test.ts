@@ -3,33 +3,56 @@
 //
 // TextFormatter Tests - Vitest Version
 
-import { afterAll, beforeAll, describe, test } from 'vitest';
+import { describe, test } from 'vitest';
 
 import { Flow } from '../src/flow';
 import { Font, FontStyle, FontWeight } from '../src/font';
-import { Renderer } from '../src/renderer';
+import { ContextBuilder, Renderer } from '../src/renderer';
 import { TextFormatter } from '../src/textformatter';
-import { createAssert, FONT_STACKS } from './vitest_test_helpers';
-
-function createTestElement() {
-  const elementId = 'test_' + Date.now() + '_' + Math.random();
-  const element = document.createElement('canvas');
-  element.id = elementId;
-  document.body.appendChild(element);
-  return elementId;
-}
+import { createAssert, FONT_STACKS, generateTestID, TestOptions } from './vitest_test_helpers';
 
 describe('TextFormatter', () => {
-  let originalFontNames: string[];
+  // Helper function to run a test with multiple backends and font stacks
+  function runTest(
+    testName: string,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    backends: Array<{ backend: number; fontStacks: string[] }> = [
+      { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
+      { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
+    ]
+  ) {
+    backends.forEach(({ backend, fontStacks }) => {
+      fontStacks.forEach((fontStackName) => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+          const elementId = generateTestID('textformatter_test');
 
-  beforeAll(async () => {
-    originalFontNames = Flow.getMusicFont();
-    Flow.setMusicFont(...FONT_STACKS['Bravura']);
-  });
+          // Create the DOM element before the test runs
+          const tagName = backend === Renderer.Backends.SVG ? 'div' : 'canvas';
+          const element = document.createElement(tagName);
+          element.id = elementId;
+          document.body.appendChild(element);
 
-  afterAll(() => {
-    Flow.setMusicFont(...originalFontNames);
-  });
+          const assert = createAssert();
+          const options: TestOptions = { elementId, params: {}, backend };
+
+          // Set font stack
+          const originalFontNames = Flow.getMusicFont();
+          Flow.setMusicFont(...FONT_STACKS[fontStackName]);
+
+          try {
+            const contextBuilder: ContextBuilder =
+              backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
+            testFunc(options, contextBuilder);
+          } finally {
+            // Restore original font
+            Flow.setMusicFont(...originalFontNames);
+            // Don't remove the element so we can see rendered output
+            // element.remove();
+          }
+        });
+      });
+    });
+  }
 
   test('Basic', () => {
     const assert = createAssert();
@@ -64,10 +87,9 @@ describe('TextFormatter', () => {
     assert.equal(formatterForRobotoSlab.cacheKey, 'Roboto_Slab%75%normal%normal');
   });
 
-  test('Accuracy', () => {
+  runTest('Accuracy', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = createTestElement();
-    const ctx = Renderer.getCanvasContext(elementId, 600, 500);
+    const ctx = contextBuilder(options.elementId, 600, 500);
     const lineHeight = 30;
     const startX = 50;
     const fonts = [
@@ -111,10 +133,9 @@ describe('TextFormatter', () => {
     assert.ok(true, 'all pass');
   });
 
-  test('Box Text', () => {
+  runTest('Box Text', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = createTestElement();
-    const ctx = Renderer.getCanvasContext(elementId, 600, 800);
+    const ctx = contextBuilder(options.elementId, 600, 800);
     let startY = 35;
     const boxBorder = 2;
     const boxPadding = 3;

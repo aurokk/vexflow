@@ -4,26 +4,16 @@
 // Key Signature Tests - Vitest Version
 //
 
-import { afterAll, beforeAll, describe, test } from 'vitest';
+import { describe, test } from 'vitest';
 
 import { Flow } from '../src/flow';
 import { Glyph } from '../src/glyph';
 import { KeySignature } from '../src/keysignature';
-import { Renderer } from '../src/renderer';
+import { ContextBuilder, Renderer } from '../src/renderer';
 import { Stave } from '../src/stave';
 import { BarlineType } from '../src/stavebarline';
-import { createAssert, FONT_STACKS, MAJOR_KEYS, makeFactory, MINOR_KEYS } from './vitest_test_helpers';
+import { createAssert, FONT_STACKS, generateTestID, MAJOR_KEYS, makeFactory, MINOR_KEYS, TestOptions } from './vitest_test_helpers';
 
-/**
- * Helper to create a unique element ID and DOM element for testing
- */
-function createTestElement() {
-  const elementId = 'test_' + Date.now() + '_' + Math.random();
-  const element = document.createElement('canvas');
-  element.id = elementId;
-  document.body.appendChild(element);
-  return elementId;
-}
 
 const fontWidths = () => {
   const glyphScale = 39; // default font scale
@@ -35,16 +25,47 @@ const fontWidths = () => {
 };
 
 describe('KeySignature', () => {
-  let originalFontNames: string[];
+  // Helper function to run a test with multiple backends and font stacks
+  function runTest(
+    testName: string,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    backends: Array<{ backend: number; fontStacks: string[] }> = [
+      { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
+      { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
+    ]
+  ) {
+    backends.forEach(({ backend, fontStacks }) => {
+      fontStacks.forEach((fontStackName) => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+          const elementId = generateTestID('keysignature_test');
 
-  beforeAll(async () => {
-    originalFontNames = Flow.getMusicFont();
-    Flow.setMusicFont(...FONT_STACKS['Bravura']);
-  });
+          // Create the DOM element before the test runs
+          const tagName = backend === Renderer.Backends.SVG ? 'div' : 'canvas';
+          const element = document.createElement(tagName);
+          element.id = elementId;
+          document.body.appendChild(element);
 
-  afterAll(() => {
-    Flow.setMusicFont(...originalFontNames);
-  });
+          const assert = createAssert();
+          const options: TestOptions = { elementId, params: {}, backend };
+
+          // Set font stack
+          const originalFontNames = Flow.getMusicFont();
+          Flow.setMusicFont(...FONT_STACKS[fontStackName]);
+
+          try {
+            const contextBuilder: ContextBuilder =
+              backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
+            testFunc(options, contextBuilder);
+          } finally {
+            // Restore original font
+            Flow.setMusicFont(...originalFontNames);
+            // Don't remove the element so we can see rendered output
+            // element.remove();
+          }
+        });
+      });
+    });
+  }
 
   test('Key Parser Test', () => {
     const assert = createAssert();
@@ -75,7 +96,7 @@ describe('KeySignature', () => {
     assert.ok(true, 'all pass');
   });
 
-  test('Major Key Test', () => {
+  runTest('Major Key Test', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const w = fontWidths();
     const accidentalCount = 28; // total number in all the keys
@@ -84,8 +105,7 @@ describe('KeySignature', () => {
     const sharpTestWidth = accidentalCount * w.sharpWidth + casePadding * testCases + Stave.defaultPadding;
     const flatTestWidth = accidentalCount * w.flatWidth + casePadding * testCases + Stave.defaultPadding;
 
-    const elementId = createTestElement();
-    const ctx = Renderer.getCanvasContext(elementId, Math.max(sharpTestWidth, flatTestWidth) + 100, 240);
+    const ctx = contextBuilder(options.elementId, Math.max(sharpTestWidth, flatTestWidth) + 100, 240);
     const stave1 = new Stave(10, 10, flatTestWidth);
     const stave2 = new Stave(10, 90, sharpTestWidth);
     const keys = MAJOR_KEYS;
@@ -109,7 +129,7 @@ describe('KeySignature', () => {
     assert.ok(true, 'all pass');
   });
 
-  test('Minor Key Test', () => {
+  runTest('Minor Key Test', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const accidentalCount = 28; // total number in all the keys
     const w = fontWidths();
@@ -118,8 +138,7 @@ describe('KeySignature', () => {
     const sharpTestWidth = accidentalCount * w.sharpWidth + casePadding * testCases + Stave.defaultPadding;
     const flatTestWidth = accidentalCount * w.flatWidth + casePadding * testCases + Stave.defaultPadding;
 
-    const elementId = createTestElement();
-    const ctx = Renderer.getCanvasContext(elementId, Math.max(sharpTestWidth, flatTestWidth) + 100, 240);
+    const ctx = contextBuilder(options.elementId, Math.max(sharpTestWidth, flatTestWidth) + 100, 240);
     const stave1 = new Stave(10, 10, flatTestWidth);
     const stave2 = new Stave(10, 90, sharpTestWidth);
     const keys = MINOR_KEYS;
@@ -143,7 +162,7 @@ describe('KeySignature', () => {
     assert.ok(true, 'all pass');
   });
 
-  test('Stave Helper', () => {
+  runTest('Stave Helper', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const w = fontWidths();
     const accidentalCount = 28; // total number in all the keys
@@ -152,8 +171,7 @@ describe('KeySignature', () => {
     const sharpTestWidth = accidentalCount * w.sharpWidth + casePadding * testCases + Stave.defaultPadding;
     const flatTestWidth = accidentalCount * w.flatWidth + casePadding * testCases + Stave.defaultPadding;
 
-    const elementId = createTestElement();
-    const ctx = Renderer.getCanvasContext(elementId, Math.max(sharpTestWidth, flatTestWidth) + 100, 240);
+    const ctx = contextBuilder(options.elementId, Math.max(sharpTestWidth, flatTestWidth) + 100, 240);
     const stave1 = new Stave(10, 10, flatTestWidth);
     const stave2 = new Stave(10, 90, sharpTestWidth);
     const keys = MAJOR_KEYS;
@@ -174,7 +192,7 @@ describe('KeySignature', () => {
     assert.ok(true, 'all pass');
   });
 
-  test('Cancelled key test', () => {
+  runTest('Cancelled key test', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const scale = 0.9;
     const w = fontWidths();
@@ -192,8 +210,7 @@ describe('KeySignature', () => {
     const eSharpTestWidth =
       28 * w.sharpWidth + 28 * w.naturalWidth + sharpPadding * sharpTestCases + Stave.defaultPadding + w.clefWidth;
     const maxWidth = Math.max(Math.max(sharpTestWidth, flatTestWidth, Math.max(eSharpTestWidth, eFlatTestWidth)));
-    const elementId = createTestElement();
-    const ctx = Renderer.getCanvasContext(elementId, maxWidth + 100, 500);
+    const ctx = contextBuilder(options.elementId, maxWidth + 100, 500);
     ctx.scale(scale, scale);
     const stave1 = new Stave(10, 10, flatTestWidth).addClef('treble');
     const stave2 = new Stave(10, 90, sharpTestWidth).addClef('treble');
@@ -244,7 +261,7 @@ describe('KeySignature', () => {
     assert.ok(true, 'all pass');
   });
 
-  test('Cancelled key (for each clef) test', () => {
+  runTest('Cancelled key (for each clef) test', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const scale = 0.8;
     const w = fontWidths();
@@ -254,8 +271,7 @@ describe('KeySignature', () => {
     const sharpsKey = [14, 7];
     const natsKey = [7, 7];
     const max = 21 * Math.max(w.sharpWidth, w.flatWidth) * 2 + keyPadding * 6 + Stave.defaultPadding + w.clefWidth;
-    const elementId = createTestElement();
-    const ctx = Renderer.getCanvasContext(elementId, max + 100, 380);
+    const ctx = contextBuilder(options.elementId, max + 100, 380);
     ctx.scale(scale, scale);
 
     const x = 20;
@@ -286,10 +302,9 @@ describe('KeySignature', () => {
     assert.ok(true, 'all pass');
   });
 
-  test('Altered key test', () => {
+  runTest('Altered key test', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = createTestElement();
-    const ctx = Renderer.getCanvasContext(elementId, 780, 500);
+    const ctx = contextBuilder(options.elementId, 780, 500);
     ctx.scale(0.9, 0.9);
     const stave1 = new Stave(10, 10, 750).addClef('treble');
     const stave2 = new Stave(10, 90, 750).addClef('treble');
@@ -340,10 +355,9 @@ describe('KeySignature', () => {
     assert.ok(true, 'all pass');
   });
 
-  test('End key with clef test', () => {
+  runTest('End key with clef test', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = createTestElement();
-    const ctx = Renderer.getCanvasContext(elementId, 400, 200);
+    const ctx = contextBuilder(options.elementId, 400, 200);
     ctx.scale(0.9, 0.9);
     const stave1 = new Stave(10, 10, 350);
     stave1
@@ -362,9 +376,9 @@ describe('KeySignature', () => {
     assert.ok(true, 'all pass');
   });
 
-  test('Key Signature Change test', () => {
+  runTest('Key Signature Change test', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 900);
+    const f = makeFactory(options.backend, options.elementId, 900);
 
     // The previous code was buggy: f.Stave(10, 10, 800), even though Factory.Stave() only accepts 1 argument.
     const stave = f.Stave({ x: 10, y: 10, width: 800 }).addClef('treble').addTimeSignature('C|');
@@ -393,9 +407,9 @@ describe('KeySignature', () => {
     assert.ok(true, 'all pass');
   });
 
-  test('Key Signature with/without clef symbol', () => {
+  runTest('Key Signature with/without clef symbol', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 900);
+    const f = makeFactory(options.backend, options.elementId, 900);
     const stave = f.Stave({ x: 10, y: 10, width: 800 }).addClef('bass').addTimeSignature('C|').setClefLines('bass');
 
     const voice = f

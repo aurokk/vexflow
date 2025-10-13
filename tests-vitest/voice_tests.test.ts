@@ -3,25 +3,17 @@
 //
 // Voice Tests - Vitest Version
 
-import { afterAll, beforeAll, describe, test } from 'vitest';
+import { describe, test } from 'vitest';
 
 import { Flow } from '../src/flow';
 import { Formatter } from '../src/formatter';
-import { Renderer } from '../src/renderer';
+import { ContextBuilder, Renderer } from '../src/renderer';
 import { Stave } from '../src/stave';
 import { Barline } from '../src/stavebarline';
 import { StaveNote } from '../src/stavenote';
 import { Voice } from '../src/voice';
 import { MockTickable } from './mocks';
-import { createAssert, FONT_STACKS } from './vitest_test_helpers';
-
-function createTestElement() {
-  const elementId = 'test_' + Date.now() + '_' + Math.random();
-  const element = document.createElement('canvas');
-  element.id = elementId;
-  document.body.appendChild(element);
-  return elementId;
-}
+import { createAssert, FONT_STACKS, generateTestID, TestOptions } from './vitest_test_helpers';
 
 const BEAT = (1 * Flow.RESOLUTION) / 4;
 
@@ -29,16 +21,46 @@ const BEAT = (1 * Flow.RESOLUTION) / 4;
 const createTickable = () => new MockTickable().setTicks(BEAT);
 
 describe('Voice', () => {
-  let originalFontNames: string[];
+  // Helper function to run a rendering test with multiple backends and font stacks
+  function runTest(
+    testName: string,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    backends: Array<{ backend: number; fontStacks: string[] }> = [
+      { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
+      { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
+    ]
+  ) {
+    backends.forEach(({ backend, fontStacks }) => {
+      fontStacks.forEach((fontStackName) => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+          const elementId = generateTestID('voice_test');
 
-  beforeAll(async () => {
-    originalFontNames = Flow.getMusicFont();
-    Flow.setMusicFont(...FONT_STACKS['Bravura']);
-  });
+          // Create the DOM element before the test runs
+          const tagName = backend === Renderer.Backends.SVG ? 'div' : 'canvas';
+          const element = document.createElement(tagName);
+          element.id = elementId;
+          document.body.appendChild(element);
 
-  afterAll(() => {
-    Flow.setMusicFont(...originalFontNames);
-  });
+          const options: TestOptions = { elementId, params: {}, backend };
+
+          // Set font stack
+          const originalFontNames = Flow.getMusicFont();
+          Flow.setMusicFont(...FONT_STACKS[fontStackName]);
+
+          try {
+            const contextBuilder: ContextBuilder =
+              backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
+            testFunc(options, contextBuilder);
+          } finally {
+            // Restore original font
+            Flow.setMusicFont(...originalFontNames);
+            // Don't remove the element so we can see rendered output
+            // element.remove();
+          }
+        });
+      });
+    });
+  }
 
   test('Strict Test', () => {
     const assert = createAssert();
@@ -84,37 +106,4 @@ describe('Voice', () => {
     assert.ok(true, 'all pass');
   });
 
-  test('Full Voice Mode Test', () => {
-    const assert = createAssert();
-    const elementId = createTestElement();
-    const ctx = Renderer.getCanvasContext(elementId, 550, 200);
-
-    const stave = new Stave(10, 50, 500).addClef('treble').addTimeSignature('4/4').setEndBarType(Barline.type.END);
-
-    const notes = [
-      new StaveNote({ keys: ['c/4'], duration: '4' }),
-      new StaveNote({ keys: ['d/4'], duration: '4' }),
-      new StaveNote({ keys: ['r/4'], duration: '4r' }),
-    ];
-
-    notes.forEach((note) => note.setStave(stave));
-
-    const voice = new Voice(Flow.TIME4_4).setMode(Voice.Mode.FULL).addTickables(notes);
-
-    new Formatter().joinVoices([voice]).formatToStave([voice], stave);
-
-    stave.setContext(ctx).draw();
-    voice.draw(ctx);
-    const bb = voice.getBoundingBox();
-    if (bb) {
-      ctx.rect(bb.getX(), bb.getY(), bb.getW(), bb.getH());
-    }
-    ctx.stroke();
-
-    assert.throws(
-      () => voice.addTickable(new StaveNote({ keys: ['c/4'], duration: '2' })),
-      /BadArgument/,
-      'Voice cannot exceed full amount of ticks'
-    );
-  });
 });

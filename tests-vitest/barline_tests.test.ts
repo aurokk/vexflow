@@ -3,25 +3,47 @@
 //
 // Barline Tests - Vitest Version
 
-import { afterAll, beforeAll, describe, test } from 'vitest';
+import { describe, test } from 'vitest';
 
 import { Factory } from '../src/factory';
 import { Flow } from '../src/flow';
-import { Renderer } from '../src/renderer';
+import { Renderer, ContextBuilder } from '../src/renderer';
 import { Barline, BarlineType } from '../src/stavebarline';
-import { ContextBuilder, createAssert, FONT_STACKS, TestOptions } from './vitest_test_helpers';
+import { createAssert, FONT_STACKS, generateTestID, TestOptions } from './vitest_test_helpers';
 
 describe('Barline', () => {
-  let originalFontNames: string[];
+  function runTest(
+    testName: string,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    backends: Array<{ backend: number; fontStacks: string[] }> = [
+      { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
+      { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
+    ]
+  ) {
+    backends.forEach(({ backend, fontStacks }) => {
+      fontStacks.forEach((fontStackName) => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+          const elementId = generateTestID('barline_test');
+          const tagName = backend === Renderer.Backends.SVG ? 'div' : 'canvas';
+          const element = document.createElement(tagName);
+          element.id = elementId;
+          document.body.appendChild(element);
 
-  beforeAll(async () => {
-    originalFontNames = Flow.getMusicFont();
-    Flow.setMusicFont(...FONT_STACKS['Bravura']);
-  });
+          const options: TestOptions = { elementId, params: {}, backend };
+          const originalFontNames = Flow.getMusicFont();
+          Flow.setMusicFont(...FONT_STACKS[fontStackName]);
 
-  afterAll(() => {
-    Flow.setMusicFont(...originalFontNames);
-  });
+          try {
+            const contextBuilder: ContextBuilder =
+              backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
+            testFunc(options, contextBuilder);
+          } finally {
+            Flow.setMusicFont(...originalFontNames);
+          }
+        });
+      });
+    });
+  }
 
   test('Enums', () => {
     const assert = createAssert();
@@ -35,25 +57,12 @@ describe('Barline', () => {
     assert.equal(a, b);
   });
 
-  function runTest(
-    name: string,
-    testFn: (options: TestOptions, contextBuilder: ContextBuilder) => void,
-    width = 450,
-    height = 140
-  ) {
-    test(name, async () => {
-      await testFn({ elementId: '', params: {}, backend: Renderer.Backends.CANVAS }, {} as ContextBuilder);
-    });
-  }
-
-  runTest('Simple BarNotes', (options: TestOptions) => {
+  runTest('Simple BarNotes', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = 'test_' + Date.now() + '_' + Math.random();
-    const element = document.createElement('canvas');
-    element.id = elementId;
-    document.body.appendChild(element);
+    
+    
 
-    const f = new Factory({ renderer: { elementId, backend: options.backend, width: 380, height: 160 } });
+    const f = new Factory({ renderer: { elementId: options.elementId, backend: options.backend, width: 380, height: 160 } });
     const stave = f.Stave();
 
     const notes = [
@@ -78,14 +87,12 @@ describe('Barline', () => {
     assert.ok(true, 'Simple Test');
   });
 
-  runTest('Style BarNotes', (options: TestOptions) => {
+  runTest('Style BarNotes', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = 'test_' + Date.now() + '_' + Math.random();
-    const element = document.createElement('canvas');
-    element.id = elementId;
-    document.body.appendChild(element);
+    
+    
 
-    const f = new Factory({ renderer: { elementId, backend: options.backend, width: 380, height: 160 } });
+    const f = new Factory({ renderer: { elementId: options.elementId, backend: options.backend, width: 380, height: 160 } });
     const stave = f.Stave();
 
     const notes = [

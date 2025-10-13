@@ -18,6 +18,7 @@ import { FretHandFinger } from '../src/frethandfinger';
 import { ModifierPosition } from '../src/modifier';
 import { Note } from '../src/note';
 import { Registry } from '../src/registry';
+import { Renderer } from '../src/renderer';
 import { Stave } from '../src/stave';
 import { StaveConnector } from '../src/staveconnector';
 import { StaveNote } from '../src/stavenote';
@@ -29,18 +30,7 @@ import { Tables } from '../src/tables';
 import { Tuplet } from '../src/tuplet';
 import { Voice, VoiceTime } from '../src/voice';
 import { MockTickable } from './mocks';
-import { createAssert, FONT_STACKS, makeFactory } from './vitest_test_helpers';
-
-/**
- * Helper to create a unique element ID and DOM element for testing
- */
-function createTestElement() {
-  const elementId = 'test_' + Date.now() + '_' + Math.random();
-  const element = document.createElement('canvas');
-  element.id = elementId;
-  document.body.appendChild(element);
-  return elementId;
-}
+import { createAssert, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
 
 /** Calculate the glyph's width in the current music font. */
 // How is this different from Glyph.getWidth()? The numbers don't match up.
@@ -68,6 +58,45 @@ describe('Formatter', () => {
   afterAll(() => {
     Flow.setMusicFont(...originalFontNames);
   });
+
+  // Helper function to run a test with multiple backends and font stacks
+  function runTest(
+    testName: string,
+    testFunc: (options: TestOptions) => void,
+    backends: Array<{ backend: number; fontStacks: string[] }> = [
+      { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
+      { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
+    ]
+  ) {
+    backends.forEach(({ backend, fontStacks }) => {
+      fontStacks.forEach((fontStackName) => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+          const elementId = generateTestID('formatter_test');
+
+          // Create the DOM element before the test runs
+          const tagName = backend === Renderer.Backends.SVG ? 'div' : 'canvas';
+          const element = document.createElement(tagName);
+          element.id = elementId;
+          document.body.appendChild(element);
+
+          const options: TestOptions = { elementId, params: {}, backend };
+
+          // Set font stack
+          const originalFontNames = Flow.getMusicFont();
+          Flow.setMusicFont(...FONT_STACKS[fontStackName]);
+
+          try {
+            testFunc(options);
+          } finally {
+            // Restore original font
+            Flow.setMusicFont(...originalFontNames);
+            // Don't remove the element so we can see rendered output
+            // element.remove();
+          }
+        });
+      });
+    });
+  }
 
   test('TickContext Building', () => {
     const assert = createAssert();
@@ -116,9 +145,9 @@ describe('Formatter', () => {
     );
   });
 
-  test('Penultimate Note Padding', () => {
+  runTest('Penultimate Note Padding', (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 500, 550);
+    const f = makeFactory(options.backend, options.elementId, 500, 550);
     const score = f.EasyScore();
     const staffWidth = 310;
     let system: System | undefined = undefined;
@@ -166,9 +195,9 @@ describe('Formatter', () => {
     assert.ok(true);
   });
 
-  test('Whitespace and justify', () => {
+  runTest('Whitespace and justify', (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 1200, 150);
+    const f = makeFactory(options.backend, options.elementId, 1200, 150);
     const getTickables = (time: VoiceTime, n: number, duration: string, duration2: string): Voice => {
       const tickar: StaveNote[] = [];
       let i = 0;
@@ -196,11 +225,11 @@ describe('Formatter', () => {
     assert.ok(true);
   });
 
-  test('Notehead padding', () => {
+  runTest('Notehead padding', (options: TestOptions) => {
     const assert = createAssert();
     const registry = new Registry();
     Registry.enableDefaultRegistry(registry);
-    const f = makeFactory(1, createTestElement(), 600, 300);
+    const f = makeFactory(options.backend, options.elementId, 600, 300);
     const score = f.EasyScore();
     score.set({ time: '9/8' });
 
@@ -227,9 +256,9 @@ describe('Formatter', () => {
     assert.ok(true);
   });
 
-  test('Justification and alignment with accidentals', () => {
+  runTest('Justification and alignment with accidentals', (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 600, 300);
+    const f = makeFactory(options.backend, options.elementId, 600, 300);
     const score = f.EasyScore();
 
     const notes11 = score.notes('a4/2, a4/4, a4/8, ab4/16, an4/16');
@@ -256,11 +285,11 @@ describe('Formatter', () => {
     assert.ok(true);
   });
 
-  test('Long measure taking full space', () => {
+  runTest('Long measure taking full space', (options: TestOptions) => {
     const assert = createAssert();
     const registry = new Registry();
     Registry.enableDefaultRegistry(registry);
-    const f = makeFactory(1, createTestElement(), 1500, 300);
+    const f = makeFactory(options.backend, options.elementId, 1500, 300);
     const score = f.EasyScore();
     score.set({ time: '4/4' });
     const notes1 = score.notes(
@@ -286,9 +315,9 @@ describe('Formatter', () => {
     assert.ok(true);
   });
 
-  test('Vertical alignment - few unaligned beats', () => {
+  runTest('Vertical alignment - few unaligned beats', (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 600, 250);
+    const f = makeFactory(options.backend, options.elementId, 600, 250);
     const score = f.EasyScore();
 
     const notes11 = [
@@ -327,7 +356,7 @@ describe('Formatter', () => {
     assert.ok(voice11.getTickables()[1].getX() > voice21.getTickables()[1].getX());
   });
 
-  test('Vertical alignment - many unaligned beats', () => {
+  runTest('Vertical alignment - many unaligned beats', (options: TestOptions) => {
     const assert = createAssert();
     const notes1 = [
       new StaveNote({ keys: ['b/4'], duration: '8r' }),
@@ -355,7 +384,7 @@ describe('Formatter', () => {
       new StaveNote({ keys: ['e/4'], duration: '4' }),
     ];
 
-    const f = makeFactory(1, createTestElement(), 750, 280);
+    const f = makeFactory(options.backend, options.elementId, 750, 280);
     const context = f.getContext();
     const voice1 = new Voice({ num_beats: 4, beat_value: 4 });
     voice1.addTickables(notes1);
@@ -378,7 +407,7 @@ describe('Formatter', () => {
     assert.ok(voice1.getTickables()[1].getX() > voice2.getTickables()[1].getX());
   });
 
-  test('Vertical alignment - many unaligned beats (global softmax)', () => {
+  runTest('Vertical alignment - many unaligned beats (global softmax)', (options: TestOptions) => {
     const assert = createAssert();
     const notes1 = [
       new StaveNote({ keys: ['b/4'], duration: '8r' }),
@@ -406,7 +435,7 @@ describe('Formatter', () => {
       new StaveNote({ keys: ['e/4'], duration: '4' }),
     ];
 
-    const f = makeFactory(1, createTestElement(), 750, 280);
+    const f = makeFactory(options.backend, options.elementId, 750, 280);
     const context = f.getContext();
     const voice1 = new Voice({ num_beats: 4, beat_value: 4 });
     voice1.addTickables(notes1);
@@ -429,9 +458,9 @@ describe('Formatter', () => {
     assert.ok(voice1.getTickables()[1].getX() > voice2.getTickables()[1].getX());
   });
 
-  test('Vertical alignment - many mixed elements', () => {
+  runTest('Vertical alignment - many mixed elements', (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 800, 500);
+    const f = makeFactory(options.backend, options.elementId, 800, 500);
     const context = f.getContext();
     const stave = new Stave(10, 200, 400);
     const stave2 = new Stave(410, 200, 400);
@@ -499,9 +528,9 @@ describe('Formatter', () => {
     assert.ok(true);
   });
 
-  test('StaveNote - Justification', () => {
+  runTest('StaveNote - Justification', (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 520, 280);
+    const f = makeFactory(options.backend, options.elementId, 520, 280);
     const ctx = f.getContext();
     const score = f.EasyScore();
 
@@ -532,9 +561,9 @@ describe('Formatter', () => {
     assert.ok(true);
   });
 
-  test('Notes with Tab', () => {
+  runTest('Notes with Tab', (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 420, 580);
+    const f = makeFactory(options.backend, options.elementId, 420, 580);
     const score = f.EasyScore();
 
     let y = 10;
@@ -582,9 +611,9 @@ describe('Formatter', () => {
     assert.ok(true);
   });
 
-  test('Multiple Staves - Justified', () => {
+  runTest('Multiple Staves - Justified', (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 600, 400);
+    const f = makeFactory(options.backend, options.elementId, 600, 400);
     const ctx = f.getContext();
     const score = f.EasyScore();
 
@@ -668,9 +697,9 @@ describe('Formatter', () => {
     assert.ok(true);
   });
 
-  test('Softmax', () => {
+  runTest('Softmax', (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 550, 500);
+    const f = makeFactory(options.backend, options.elementId, 550, 500);
     const textX = 450 / 0.8;
     f.getContext().scale(0.8, 0.8);
 
@@ -710,9 +739,9 @@ describe('Formatter', () => {
     draw(450, 15);
   });
 
-  test('Mixtime', () => {
+  runTest('Mixtime', (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 400 + Stave.defaultPadding, 250);
+    const f = makeFactory(options.backend, options.elementId, 400 + Stave.defaultPadding, 250);
     f.getContext().scale(0.8, 0.8);
     const score = f.EasyScore();
     const system = f.System({
@@ -741,9 +770,9 @@ describe('Formatter', () => {
     assert.ok(true);
   });
 
-  test('Tight', () => {
+  runTest('Tight', (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 440, 250);
+    const f = makeFactory(options.backend, options.elementId, 440, 250);
     f.getContext().scale(0.8, 0.8);
     const score = f.EasyScore();
     const system = f.System({
@@ -774,9 +803,9 @@ describe('Formatter', () => {
     assert.ok(true);
   });
 
-  test('Tight 2', () => {
+  runTest('Tight 2', (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 440, 250);
+    const f = makeFactory(options.backend, options.elementId, 440, 250);
     f.getContext().scale(0.8, 0.8);
     const score = f.EasyScore();
     const system = f.System({
@@ -804,11 +833,11 @@ describe('Formatter', () => {
     assert.ok(true);
   });
 
-  test('Annotations', () => {
+  runTest('Annotations', (options: TestOptions) => {
     const assert = createAssert();
     const pageWidth = 916;
     const pageHeight = 600;
-    const f = makeFactory(1, createTestElement(), pageWidth, pageHeight);
+    const f = makeFactory(options.backend, options.elementId, pageWidth, pageHeight);
     const context = f.getContext();
 
     const lyrics1 = ['ipso', 'ipso-', 'ipso', 'ipso', 'ipsoz', 'ipso-', 'ipso', 'ipso', 'ipso', 'ip', 'ipso'];
@@ -907,12 +936,12 @@ describe('Formatter', () => {
     assert.ok(true);
   });
 
-  test('Proportional Formatting - No Tuning', () => {
+  runTest('Proportional Formatting - No Tuning', (options: TestOptions) => {
     const assert = createAssert();
     const debug = true;
     Registry.enableDefaultRegistry(new Registry());
 
-    const f = makeFactory(1, createTestElement(), 775, 750);
+    const f = makeFactory(options.backend, options.elementId, 775, 750);
     const system = f.System({
       x: 50,
       autoWidth: true,
@@ -947,12 +976,12 @@ describe('Formatter', () => {
     assert.ok(true);
   });
 
-  test('Proportional Formatting - No Justification', () => {
+  runTest('Proportional Formatting - No Justification', (options: TestOptions) => {
     const assert = createAssert();
     const debug = true;
     Registry.enableDefaultRegistry(new Registry());
 
-    const f = makeFactory(1, createTestElement(), 775, 750);
+    const f = makeFactory(options.backend, options.elementId, 775, 750);
     const system = f.System({
       x: 50,
       autoWidth: true,
@@ -987,12 +1016,12 @@ describe('Formatter', () => {
     assert.ok(true);
   });
 
-  test('Proportional Formatting (20 iterations)', () => {
+  runTest('Proportional Formatting (20 iterations)', (options: TestOptions) => {
     const assert = createAssert();
     const debug = true;
     Registry.enableDefaultRegistry(new Registry());
 
-    const f = makeFactory(1, createTestElement(), 775, 750);
+    const f = makeFactory(options.backend, options.elementId, 775, 750);
     const system = f.System({
       x: 50,
       autoWidth: true,

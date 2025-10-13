@@ -3,35 +3,53 @@
 //
 // Factory Tests - Vitest Version
 
-import { afterAll, beforeAll, describe, test } from 'vitest';
+import { describe, test } from 'vitest';
 
 import { Factory } from '../src/factory';
 import { Flow } from '../src/flow';
+import { Renderer } from '../src/renderer';
 import { Barline } from '../src/stavebarline';
-import { createAssert, FONT_STACKS, makeFactory } from './vitest_test_helpers';
-
-/**
- * Helper to create a unique element ID and DOM element for testing
- */
-function createTestElement() {
-  const elementId = 'test_' + Date.now() + '_' + Math.random();
-  const element = document.createElement('canvas');
-  element.id = elementId;
-  document.body.appendChild(element);
-  return elementId;
-}
+import { createAssert, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
 
 describe('Factory', () => {
-  let originalFontNames: string[];
+  // Helper function to run a test with multiple backends and font stacks
+  function runTest(
+    testName: string,
+    testFunc: (options: TestOptions) => void,
+    backends: Array<{ backend: number; fontStacks: string[] }> = [
+      { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
+      { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
+    ]
+  ) {
+    backends.forEach(({ backend, fontStacks }) => {
+      fontStacks.forEach((fontStackName) => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+          const elementId = generateTestID('factory_test');
 
-  beforeAll(async () => {
-    originalFontNames = Flow.getMusicFont();
-    Flow.setMusicFont(...FONT_STACKS['Bravura']);
-  });
+          // Create the DOM element before the test runs
+          const tagName = backend === Renderer.Backends.SVG ? 'div' : 'canvas';
+          const element = document.createElement(tagName);
+          element.id = elementId;
+          document.body.appendChild(element);
 
-  afterAll(() => {
-    Flow.setMusicFont(...originalFontNames);
-  });
+          const options: TestOptions = { elementId, params: {}, backend };
+
+          // Set font stack
+          const originalFontNames = Flow.getMusicFont();
+          Flow.setMusicFont(...FONT_STACKS[fontStackName]);
+
+          try {
+            testFunc(options);
+          } finally {
+            // Restore original font
+            Flow.setMusicFont(...originalFontNames);
+            // Don't remove the element so we can see rendered output
+            // element.remove();
+          }
+        });
+      });
+    });
+  }
 
   test('Defaults', () => {
     const assert = createAssert();
@@ -48,25 +66,24 @@ describe('Factory', () => {
 
     // eslint-disable-next-line
     // @ts-ignore access a protected member for testing purposes.
-    const options = factory.options;
-    assert.equal(options.renderer.width, 700);
-    assert.equal(options.renderer.height, 500);
-    assert.equal(options.renderer.elementId, null);
-    assert.equal(options.stave.space, 10);
+    const factoryOptions = factory.options;
+    assert.equal(factoryOptions.renderer.width, 700);
+    assert.equal(factoryOptions.renderer.height, 500);
+    assert.equal(factoryOptions.renderer.elementId, null);
+    assert.equal(factoryOptions.stave.space, 10);
   });
 
-  test('Draw', () => {
+  runTest('Draw', (options: TestOptions) => {
     const assert = createAssert();
-    const elementId = createTestElement();
-    const f = Factory.newFromElementId(elementId);
+    const f = Factory.newFromElementId(options.elementId);
     f.Stave().setClef('treble');
     f.draw();
     assert.ok(true);
   });
 
-  test('Draw Tab (repeat barlines must be aligned)', () => {
+  runTest('Draw Tab (repeat barlines must be aligned)', (options: TestOptions) => {
     const assert = createAssert();
-    const factory = makeFactory(1, createTestElement(), 500, 400);
+    const factory = makeFactory(options.backend, options.elementId, 500, 400);
     const system = factory.System({ width: 500 });
     const stave = factory.Stave().setClef('treble').setKeySignature('C#').setBegBarType(Barline.type.REPEAT_BEGIN);
     const voices = [factory.Voice().addTickables([factory.GhostNote({ duration: 'w' })])];

@@ -3,39 +3,26 @@
 //
 // TimeSignature Tests - Vitest Version
 
-import { afterAll, beforeAll, describe, test } from 'vitest';
+import { describe, test } from 'vitest';
 
 import { Flow } from '../src/flow';
-import { Renderer } from '../src/renderer';
+import { ContextBuilder, Renderer } from '../src/renderer';
 import { Stave, StaveLineConfig } from '../src/stave';
 import { StaveConnector } from '../src/staveconnector';
 import { TimeSignature } from '../src/timesignature';
-import { createAssert, FONT_STACKS, makeFactory } from './vitest_test_helpers';
-
-function createTestElement() {
-  const elementId = 'test_' + Date.now() + '_' + Math.random();
-  const element = document.createElement('canvas');
-  element.id = elementId;
-  document.body.appendChild(element);
-  return elementId;
-}
+import { createAssert, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
 
 describe('TimeSignature', () => {
-  let originalFontNames: string[];
-
-  beforeAll(async () => {
-    originalFontNames = Flow.getMusicFont();
-    Flow.setMusicFont(...FONT_STACKS['Bravura']);
-  });
-
-  afterAll(() => {
-    Flow.setMusicFont(...originalFontNames);
-  });
-
   test('Time Signature Parser', () => {
     const assert = createAssert();
-    const timeSig = new TimeSignature();
-    assert.equal(timeSig.getTimeSpec(), '4/4', 'default time signature is 4/4');
+
+    // Set up font for unit test
+    const originalFontNames = Flow.getMusicFont();
+    Flow.setMusicFont(...FONT_STACKS['Bravura']);
+
+    try {
+      const timeSig = new TimeSignature();
+      assert.equal(timeSig.getTimeSpec(), '4/4', 'default time signature is 4/4');
 
     const mustFail = ['asdf', '123/', '/10', '/', '4567', 'C+', '1+', '+1', '(3+', '+3)', '()', '(+)'];
     mustFail.forEach((invalidString) => {
@@ -45,21 +32,65 @@ describe('TimeSignature', () => {
     const mustPass = ['4/4', '10/12', '1/8', '1234567890/1234567890', 'C', 'C|', '+'];
     mustPass.forEach((validString) => timeSig.parseTimeSpec(validString));
 
-    timeSig.setTimeSig('4/4');
-    assert.equal(timeSig.getIsNumeric(), true, '4/4 is numeric');
-    assert.equal(timeSig.getLine(), 0, 'digits are on line 0');
-    timeSig.setTimeSig('C|');
-    assert.equal(timeSig.getTimeSpec(), 'C|', 'timeSpec changed to C|');
-    assert.equal(timeSig.getIsNumeric(), false, 'cut time is not numeric');
-    assert.equal(timeSig.getLine(), 2, 'cut/common are on line 2');
+      timeSig.setTimeSig('4/4');
+      assert.equal(timeSig.getIsNumeric(), true, '4/4 is numeric');
+      assert.equal(timeSig.getLine(), 0, 'digits are on line 0');
+      timeSig.setTimeSig('C|');
+      assert.equal(timeSig.getTimeSpec(), 'C|', 'timeSpec changed to C|');
+      assert.equal(timeSig.getIsNumeric(), false, 'cut time is not numeric');
+      assert.equal(timeSig.getLine(), 2, 'cut/common are on line 2');
 
-    assert.ok(true, 'all pass');
+      assert.ok(true, 'all pass');
+    } finally {
+      // Restore original font
+      Flow.setMusicFont(...originalFontNames);
+    }
   });
 
-  test('Basic Time Signatures', () => {
+  // Helper function to run a test with multiple backends and font stacks
+  function runTest(
+    testName: string,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    backends: Array<{ backend: number; fontStacks: string[] }> = [
+      { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
+      { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
+    ]
+  ) {
+    backends.forEach(({ backend, fontStacks }) => {
+      fontStacks.forEach((fontStackName) => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+          const elementId = generateTestID('timesig_test');
+
+          // Create the DOM element before the test runs
+          const tagName = backend === Renderer.Backends.SVG ? 'div' : 'canvas';
+          const element = document.createElement(tagName);
+          element.id = elementId;
+          document.body.appendChild(element);
+
+          const options: TestOptions = { elementId, params: {}, backend };
+
+          // Set font stack
+          const originalFontNames = Flow.getMusicFont();
+          Flow.setMusicFont(...FONT_STACKS[fontStackName]);
+
+          try {
+            const contextBuilder: ContextBuilder =
+              backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
+            testFunc(options, contextBuilder);
+          } finally {
+            // Restore original font
+            Flow.setMusicFont(...originalFontNames);
+            // Don't remove the element so we can see rendered output
+            // element.remove();
+          }
+        });
+      });
+    });
+  }
+
+  runTest('Basic Time Signatures', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = createTestElement();
-    const ctx = Renderer.getCanvasContext(elementId, 600, 120);
+    const ctx = contextBuilder(options.elementId, 600, 120);
 
     new Stave(10, 10, 500)
       .addTimeSignature('2/2')
@@ -81,10 +112,9 @@ describe('TimeSignature', () => {
     assert.ok(true, 'all pass');
   });
 
-  test('Big Signature Test', () => {
+  runTest('Big Signature Test', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = createTestElement();
-    const ctx = Renderer.getCanvasContext(elementId, 400, 120);
+    const ctx = contextBuilder(options.elementId, 400, 120);
 
     new Stave(10, 10, 300)
       .addTimeSignature('12/8')
@@ -97,40 +127,36 @@ describe('TimeSignature', () => {
     assert.ok(true, 'all pass');
   });
 
-  test('Additive Signature Test', () => {
+  runTest('Additive Signature Test', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = createTestElement();
-    const ctx = Renderer.getCanvasContext(elementId, 400, 120);
+    const ctx = contextBuilder(options.elementId, 400, 120);
 
     new Stave(10, 10, 300).addTimeSignature('2+3+2/8').setContext(ctx).draw();
 
     assert.ok(true, 'all pass');
   });
 
-  test('Alternating Signature Test', () => {
+  runTest('Alternating Signature Test', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = createTestElement();
-    const ctx = Renderer.getCanvasContext(elementId, 400, 120);
+    const ctx = contextBuilder(options.elementId, 400, 120);
 
     new Stave(10, 10, 300).addTimeSignature('6/8').addTimeSignature('+').addTimeSignature('3/4').setContext(ctx).draw();
 
     assert.ok(true, 'all pass');
   });
 
-  test('Interchangeable Signature Test', () => {
+  runTest('Interchangeable Signature Test', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = createTestElement();
-    const ctx = Renderer.getCanvasContext(elementId, 400, 120);
+    const ctx = contextBuilder(options.elementId, 400, 120);
 
     new Stave(10, 10, 300).addTimeSignature('3/4').addTimeSignature('-').addTimeSignature('2/4').setContext(ctx).draw();
 
     assert.ok(true, 'all pass');
   });
 
-  test('Aggregate Signature Test', () => {
+  runTest('Aggregate Signature Test', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = createTestElement();
-    const ctx = Renderer.getCanvasContext(elementId, 400, 120);
+    const ctx = contextBuilder(options.elementId, 400, 120);
 
     new Stave(10, 10, 300)
       .addTimeSignature('2/4')
@@ -144,10 +170,9 @@ describe('TimeSignature', () => {
     assert.ok(true, 'all pass');
   });
 
-  test('Complex Signature Test', () => {
+  runTest('Complex Signature Test', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = createTestElement();
-    const ctx = Renderer.getCanvasContext(elementId, 400, 120);
+    const ctx = contextBuilder(options.elementId, 400, 120);
 
     new Stave(10, 10, 300)
       .addTimeSignature('(2+3)/16')
@@ -159,10 +184,9 @@ describe('TimeSignature', () => {
     assert.ok(true, 'all pass');
   });
 
-  test('Time Signature multiple staves alignment test', () => {
+  runTest('Time Signature multiple staves alignment test', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = createTestElement();
-    const ctx = Renderer.getCanvasContext(elementId, 400, 350);
+    const ctx = contextBuilder(options.elementId, 400, 350);
 
     const stave1LineConfig: StaveLineConfig[] = [false, false, true, false, false].map((visible) => ({ visible }));
     const stave1 = new Stave(15, 0, 300)
@@ -183,9 +207,9 @@ describe('TimeSignature', () => {
     assert.ok(true, 'all pass');
   });
 
-  test('Time Signature Change Test', () => {
+  runTest('Time Signature Change Test', (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 900);
+    const f = makeFactory(options.backend, options.elementId, 900);
     const stave = f.Stave({ x: 0, y: 0 }).addClef('treble').addTimeSignature('C|');
 
     const tickables = [

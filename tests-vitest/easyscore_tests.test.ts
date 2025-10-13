@@ -3,7 +3,7 @@
 //
 // EasyScore Tests - Vitest Version
 
-import { afterAll, beforeAll, describe, test } from 'vitest';
+import { describe, test } from 'vitest';
 
 import { Articulation } from '../src/articulation';
 import { EasyScore } from '../src/easyscore';
@@ -11,21 +11,11 @@ import { Flow } from '../src/flow';
 import { FretHandFinger } from '../src/frethandfinger';
 import { Modifier } from '../src/modifier';
 import { Parenthesis } from '../src/parenthesis';
+import { Renderer } from '../src/renderer';
 import { StaveConnector } from '../src/staveconnector';
 import { Stem } from '../src/stem';
 import { Tuplet } from '../src/tuplet';
-import { createAssert, FONT_STACKS, makeFactory } from './vitest_test_helpers';
-
-/**
- * Helper to create a unique element ID and DOM element for testing
- */
-function createTestElement() {
-  const elementId = 'test_' + Date.now() + '_' + Math.random();
-  const element = document.createElement('canvas');
-  element.id = elementId;
-  document.body.appendChild(element);
-  return elementId;
-}
+import { createAssert, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
 
 /**
  * Use Function.prototype.bind() to create shortcut methods.
@@ -41,16 +31,44 @@ function createShortcuts(score: EasyScore) {
 }
 
 describe('EasyScore', () => {
-  let originalFontNames: string[];
+  // Helper function to run a test with multiple backends and font stacks
+  function runTest(
+    testName: string,
+    testFunc: (options: TestOptions) => void,
+    backends: Array<{ backend: number; fontStacks: string[] }> = [
+      { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
+      { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
+    ]
+  ) {
+    backends.forEach(({ backend, fontStacks }) => {
+      fontStacks.forEach((fontStackName) => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+          const elementId = generateTestID('easyscore_test');
 
-  beforeAll(async () => {
-    originalFontNames = Flow.getMusicFont();
-    Flow.setMusicFont(...FONT_STACKS['Bravura']);
-  });
+          // Create the DOM element before the test runs
+          const tagName = backend === Renderer.Backends.SVG ? 'div' : 'canvas';
+          const element = document.createElement(tagName);
+          element.id = elementId;
+          document.body.appendChild(element);
 
-  afterAll(() => {
-    Flow.setMusicFont(...originalFontNames);
-  });
+          const options: TestOptions = { elementId, params: {}, backend };
+
+          // Set font stack
+          const originalFontNames = Flow.getMusicFont();
+          Flow.setMusicFont(...FONT_STACKS[fontStackName]);
+
+          try {
+            testFunc(options);
+          } finally {
+            // Restore original font
+            Flow.setMusicFont(...originalFontNames);
+            // Don't remove the element so we can see rendered output
+            // element.remove();
+          }
+        });
+      });
+    });
+  }
 
   test('Basic', () => {
     const assert = createAssert();
@@ -191,9 +209,9 @@ describe('EasyScore', () => {
     mustFail.forEach((line) => assert.equal(score.parse(line).success, false, line));
   });
 
-  test('Draw Basic', () => {
+  runTest('Draw Basic', (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 600, 350);
+    const f = makeFactory(options.backend, options.elementId, 600, 350);
     const score = f.EasyScore();
     const system = f.System();
 
@@ -219,9 +237,9 @@ describe('EasyScore', () => {
     assert.ok(true);
   });
 
-  test('Draw Different KeySignature', () => {
+  runTest('Draw Different KeySignature', (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 600, 350);
+    const f = makeFactory(options.backend, options.elementId, 600, 350);
     const score = f.EasyScore();
     const system = f.System();
 
@@ -250,9 +268,9 @@ describe('EasyScore', () => {
     assert.ok(true);
   });
 
-  test('Draw Basic Muted', () => {
+  runTest('Draw Basic Muted', (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 600, 350);
+    const f = makeFactory(options.backend, options.elementId, 600, 350);
     const score = f.EasyScore();
     const system = f.System();
 
@@ -278,9 +296,9 @@ describe('EasyScore', () => {
     assert.ok(true);
   });
 
-  test('Draw Basic Harmonic', () => {
+  runTest('Draw Basic Harmonic', (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 600, 350);
+    const f = makeFactory(options.backend, options.elementId, 600, 350);
     const score = f.EasyScore();
     const system = f.System();
 
@@ -306,9 +324,9 @@ describe('EasyScore', () => {
     assert.ok(true);
   });
 
-  test('Draw Basic Slash', () => {
+  runTest('Draw Basic Slash', (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 600, 350);
+    const f = makeFactory(options.backend, options.elementId, 600, 350);
     const score = f.EasyScore();
     const system = f.System();
 
@@ -334,9 +352,9 @@ describe('EasyScore', () => {
     assert.ok(true);
   });
 
-  test('Draw Ghostnote Basic', () => {
+  runTest('Draw Ghostnote Basic', (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 550);
+    const f = makeFactory(options.backend, options.elementId, 550);
     const score = f.EasyScore();
     const system = f.System();
 
@@ -360,9 +378,9 @@ describe('EasyScore', () => {
     assert.ok(true);
   });
 
-  test('Draw Ghostnote Dotted', () => {
+  runTest('Draw Ghostnote Dotted', (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 550);
+    const f = makeFactory(options.backend, options.elementId, 550);
     const score = f.EasyScore();
     const system = f.System();
 
@@ -392,9 +410,9 @@ describe('EasyScore', () => {
     assert.ok(true);
   });
 
-  test('Draw Parenthesised', () => {
+  runTest('Draw Parenthesised', (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 600, 350);
+    const f = makeFactory(options.backend, options.elementId, 600, 350);
     const score = f.EasyScore();
     const system = f.System();
 
@@ -424,9 +442,9 @@ describe('EasyScore', () => {
     assert.ok(true);
   });
 
-  test('Draw Accidentals', () => {
+  runTest('Draw Accidentals', (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 600, 350);
+    const f = makeFactory(options.backend, options.elementId, 600, 350);
     const score = f.EasyScore();
     const system = f.System();
 
@@ -452,9 +470,9 @@ describe('EasyScore', () => {
     assert.ok(true);
   });
 
-  test('Draw Beams', () => {
+  runTest('Draw Beams', (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 600, 250);
+    const f = makeFactory(options.backend, options.elementId, 600, 250);
     const score = f.EasyScore();
     const system = f.System();
 
@@ -473,9 +491,9 @@ describe('EasyScore', () => {
     assert.ok(true);
   });
 
-  test('Draw Tuplets', () => {
+  runTest('Draw Tuplets', (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 600, 250);
+    const f = makeFactory(options.backend, options.elementId, 600, 250);
     const score = f.EasyScore();
     const system = f.System();
 
@@ -499,9 +517,9 @@ describe('EasyScore', () => {
     assert.ok(true);
   });
 
-  test('Draw Dots', () => {
+  runTest('Draw Dots', (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 600, 250);
+    const f = makeFactory(options.backend, options.elementId, 600, 250);
     const score = f.EasyScore();
     const system = f.System();
 
@@ -517,9 +535,9 @@ describe('EasyScore', () => {
     assert.ok(true);
   });
 
-  test('Draw Options', () => {
+  runTest('Draw Options', (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 500, 200);
+    const f = makeFactory(options.backend, options.elementId, 500, 200);
     const score = f.EasyScore();
     const system = f.System();
 
@@ -553,9 +571,9 @@ describe('EasyScore', () => {
     assert.equal(notes[2].getStemDirection(), Stem.DOWN);
   });
 
-  test('Draw Fingerings', () => {
+  runTest('Draw Fingerings', (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 500, 200);
+    const f = makeFactory(options.backend, options.elementId, 500, 200);
     const score = f.EasyScore();
     const system = f.System();
 
@@ -597,9 +615,9 @@ describe('EasyScore', () => {
     assert.equal(note3_modifier2.getPosition(), Modifier.Position.LEFT);
   });
 
-  test('Keys', () => {
+  runTest('Keys', (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 700, 200);
+    const f = makeFactory(options.backend, options.elementId, 700, 200);
     const score = f.EasyScore();
     const system = f.System();
     const notes = score.notes(

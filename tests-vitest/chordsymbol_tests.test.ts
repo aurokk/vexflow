@@ -3,7 +3,7 @@
 //
 // ChordSymbol Tests - Vitest Version
 
-import { afterAll, beforeAll, describe, test } from 'vitest';
+import { describe, test } from 'vitest';
 
 import { Accidental } from '../src/accidental';
 import { ChordSymbol } from '../src/chordsymbol';
@@ -16,18 +16,7 @@ import { Renderer } from '../src/renderer';
 import { Stave } from '../src/stave';
 import { StaveNote } from '../src/stavenote';
 import { Tables } from '../src/tables';
-import { createAssert, FONT_STACKS, makeFactory } from './vitest_test_helpers';
-
-/**
- * Helper to create a unique element ID and DOM element for testing
- */
-function createTestElement() {
-  const elementId = 'test_' + Date.now() + '_' + Math.random();
-  const element = document.createElement('canvas');
-  element.id = elementId;
-  document.body.appendChild(element);
-  return elementId;
-}
+import { createAssert, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
 
 // Options for customizing addGlyphOrText() or addGlyph().
 const superscript = { symbolModifier: ChordSymbol.symbolModifiers.SUPERSCRIPT };
@@ -38,14 +27,7 @@ const note = (factory: Factory, keys: string[], duration: string, chordSymbol: C
   factory.StaveNote({ keys, duration }).addModifier(chordSymbol, 0);
 
 /** Calculate the glyph's width in the current music font. */
-// How is this different from Glyph.getWidth()? The numbers don't match up.
 function getGlyphWidth(glyphName: string): number {
-  // `38` seems to be the `font_scale` specified in many classes, such as
-  // Accidental, Articulation, Ornament, Strokes. Does this mean `38pt`???
-  //
-  // However, tables.ts specifies:
-  //   NOTATION_FONT_SCALE: 39,
-  //   TABLATURE_FONT_SCALE: 39,
   const musicFont = Tables.currentMusicFont();
   const glyph: FontGlyph = musicFont.getGlyphs()[glyphName];
   const widthInEm = (glyph.x_max - glyph.x_min) / musicFont.getResolution();
@@ -53,20 +35,47 @@ function getGlyphWidth(glyphName: string): number {
 }
 
 describe('ChordSymbol', () => {
-  let originalFontNames: string[];
+  // Helper function to run a test with multiple backends and font stacks
+  function runTest(
+    testName: string,
+    testFunc: (options: TestOptions) => void,
+    backends: Array<{ backend: number; fontStacks: string[] }> = [
+      { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
+      { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
+    ]
+  ) {
+    backends.forEach(({ backend, fontStacks }) => {
+      fontStacks.forEach((fontStackName) => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+          const elementId = generateTestID('chordsymbol_test');
 
-  beforeAll(async () => {
-    originalFontNames = Flow.getMusicFont();
-    Flow.setMusicFont(...FONT_STACKS['Bravura']);
-  });
+          // Create the DOM element before the test runs
+          const tagName = backend === Renderer.Backends.SVG ? 'div' : 'canvas';
+          const element = document.createElement(tagName);
+          element.id = elementId;
+          document.body.appendChild(element);
 
-  afterAll(() => {
-    Flow.setMusicFont(...originalFontNames);
-  });
+          const options: TestOptions = { elementId, params: {}, backend };
 
-  test('Chord Symbol With Modifiers', () => {
-    const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 750, 580);
+          // Set font stack
+          const originalFontNames = Flow.getMusicFont();
+          Flow.setMusicFont(...FONT_STACKS[fontStackName]);
+
+          try {
+            testFunc(options);
+          } finally {
+            // Restore original font
+            Flow.setMusicFont(...originalFontNames);
+            // Don't remove the element so we can see rendered output
+            // element.remove();
+          }
+        });
+      });
+    });
+  }
+
+  runTest('Chord Symbol With Modifiers', (options: TestOptions) => {
+    const f = makeFactory(options.backend, options.elementId, 750, 580);
     const ctx = f.getContext();
     ctx.scale(1.5, 1.5);
 
@@ -154,12 +163,11 @@ describe('ChordSymbol', () => {
     ];
     draw(chords, 240);
 
-    assert.ok(true, 'Font Size Chord Symbol');
+    createAssert().ok(true, 'Font Size Chord Symbol');
   });
 
-  test('Chord Symbol Font Size Tests', () => {
-    const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 750, 580);
+  runTest('Chord Symbol Font Size Tests', (options: TestOptions) => {
+    const f = makeFactory(options.backend, options.elementId, 750, 580);
     const ctx = f.getContext();
     ctx.scale(1.5, 1.5);
 
@@ -251,12 +259,11 @@ describe('ChordSymbol', () => {
     ];
     draw(chords, 240);
 
-    assert.ok(true, 'Font Size Chord Symbol');
+    createAssert().ok(true, 'Font Size Chord Symbol');
   });
 
-  test('Chord Symbol Kerning Tests', () => {
-    const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 650 * 1.5, 650);
+  runTest('Chord Symbol Kerning Tests', (options: TestOptions) => {
+    const f = makeFactory(options.backend, options.elementId, 650 * 1.5, 650);
     const ctx = f.getContext();
     ctx.scale(1.5, 1.5);
 
@@ -307,12 +314,11 @@ describe('ChordSymbol', () => {
     ];
     draw(chords, 310);
 
-    assert.ok(true, 'Chord Symbol Kerning Tests');
+    createAssert().ok(true, 'Chord Symbol Kerning Tests');
   });
 
-  test('Top Chord Symbols', () => {
-    const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 650 * 1.5, 650);
+  runTest('Top Chord Symbols', (options: TestOptions) => {
+    const f = makeFactory(options.backend, options.elementId, 650 * 1.5, 650);
     const ctx = f.getContext();
     ctx.scale(1.5, 1.5);
 
@@ -363,16 +369,12 @@ describe('ChordSymbol', () => {
     chord2 = f.ChordSymbol().addText('C').addTextSuperscript('sus4');
     draw(chord1, chord2, 240);
 
-    assert.ok(true, 'Top Chord Symbol');
+    createAssert().ok(true, 'Top Chord Symbol');
   });
 
-  test('Top Chord Symbols Justified', () => {
-    const assert = createAssert();
-    const elementId = createTestElement();
-    const renderer = new Renderer(elementId, Renderer.Backends.CANVAS);
-    renderer.resize(500 * 1.5, 680);
-    const ctx = renderer.getContext();
-    const f = makeFactory(1, elementId, 500 * 1.5, 680);
+  runTest('Top Chord Symbols Justified', (options: TestOptions) => {
+    const f = makeFactory(options.backend, options.elementId, 500 * 1.5, 680);
+    const ctx = f.getContext();
     ctx.scale(1.5, 1.5);
 
     function draw(chord1: ChordSymbol, chord2: ChordSymbol, y: number) {
@@ -415,16 +417,12 @@ describe('ChordSymbol', () => {
     chord2 = f.ChordSymbol({ hJustify: 'centerStem' }).addText('C').addTextSuperscript('Maj.');
     draw(chord1, chord2, 340);
 
-    assert.ok(true, 'Top Chord Justified');
+    createAssert().ok(true, 'Top Chord Justified');
   });
 
-  test('Bottom Chord Symbols', () => {
-    const assert = createAssert();
-    const elementId = createTestElement();
-    const renderer = new Renderer(elementId, Renderer.Backends.CANVAS);
-    renderer.resize(600 * 1.5, 230);
-    const ctx = renderer.getContext();
-    const f = makeFactory(1, elementId, 600 * 1.5, 230);
+  runTest('Bottom Chord Symbols', (options: TestOptions) => {
+    const f = makeFactory(options.backend, options.elementId, 600 * 1.5, 230);
+    const ctx = f.getContext();
     ctx.scale(1.5, 1.5);
 
     function draw(chords: ChordSymbol[], y: number) {
@@ -447,16 +445,12 @@ describe('ChordSymbol', () => {
     ];
 
     draw(chords, 10);
-    assert.ok(true, 'Bottom Chord Symbol');
+    createAssert().ok(true, 'Bottom Chord Symbol');
   });
 
-  test('Bottom Stem Down Chord Symbols', () => {
-    const assert = createAssert();
-    const elementId = createTestElement();
-    const renderer = new Renderer(elementId, Renderer.Backends.CANVAS);
-    renderer.resize(600 * 1.5, 330);
-    const ctx = renderer.getContext();
-    const f = makeFactory(1, elementId, 600 * 1.5, 330);
+  runTest('Bottom Stem Down Chord Symbols', (options: TestOptions) => {
+    const f = makeFactory(options.backend, options.elementId, 600 * 1.5, 330);
+    const ctx = f.getContext();
     ctx.scale(1.5, 1.5);
 
     function draw(chords: ChordSymbol[], y: number) {
@@ -482,12 +476,11 @@ describe('ChordSymbol', () => {
     ];
 
     draw(chords, 10);
-    assert.ok(true, 'Bottom Stem Down Chord Symbol');
+    createAssert().ok(true, 'Bottom Stem Down Chord Symbol');
   });
 
-  test('Double Bottom Chord Symbols', () => {
-    const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 600 * 1.5, 260);
+  runTest('Double Bottom Chord Symbols', (options: TestOptions) => {
+    const f = makeFactory(options.backend, options.elementId, 600 * 1.5, 260);
     const ctx = f.getContext();
     ctx.scale(1.5, 1.5);
 
@@ -520,6 +513,6 @@ describe('ChordSymbol', () => {
     ];
 
     draw(chords1, chords2, 10);
-    assert.ok(true, '2 Bottom Chord Symbol');
+    createAssert().ok(true, '2 Bottom Chord Symbol');
   });
 });

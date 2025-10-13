@@ -4,25 +4,15 @@
 // Clef Key Signature Tests - Vitest Version
 //
 
-import { afterAll, beforeAll, describe, test } from 'vitest';
+import { describe, test } from 'vitest';
 
 import { Flow } from '../src/flow';
 import { Glyph } from '../src/glyph';
 import { KeySignature } from '../src/keysignature';
-import { Renderer } from '../src/renderer';
+import { ContextBuilder, Renderer } from '../src/renderer';
 import { Stave } from '../src/stave';
-import { createAssert, FONT_STACKS, MAJOR_KEYS, MINOR_KEYS } from './vitest_test_helpers';
+import { createAssert, FONT_STACKS, generateTestID, MAJOR_KEYS, MINOR_KEYS, TestOptions } from './vitest_test_helpers';
 
-/**
- * Helper to create a unique element ID and DOM element for testing
- */
-function createTestElement() {
-  const elementId = 'test_' + Date.now() + '_' + Math.random();
-  const element = document.createElement('canvas');
-  element.id = elementId;
-  document.body.appendChild(element);
-  return elementId;
-}
 
 const fontWidths = () => {
   const glyphScale = 39; // default font scale
@@ -35,18 +25,49 @@ const fontWidths = () => {
 };
 
 describe('Clef Keys', () => {
-  let originalFontNames: string[];
+  // Helper function to run a test with multiple backends and font stacks
+  function runTest(
+    testName: string,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    backends: Array<{ backend: number; fontStacks: string[] }> = [
+      { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
+      { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
+    ]
+  ) {
+    backends.forEach(({ backend, fontStacks }) => {
+      fontStacks.forEach((fontStackName) => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+          const elementId = generateTestID('key_clef_test');
 
-  beforeAll(async () => {
-    originalFontNames = Flow.getMusicFont();
-    Flow.setMusicFont(...FONT_STACKS['Bravura']);
-  });
+          // Create the DOM element before the test runs
+          const tagName = backend === Renderer.Backends.SVG ? 'div' : 'canvas';
+          const element = document.createElement(tagName);
+          element.id = elementId;
+          document.body.appendChild(element);
 
-  afterAll(() => {
-    Flow.setMusicFont(...originalFontNames);
-  });
+          const assert = createAssert();
+          const options: TestOptions = { elementId, params: {}, backend };
 
-  test('Major Key Clef Test', () => {
+          // Set font stack
+          const originalFontNames = Flow.getMusicFont();
+          Flow.setMusicFont(...FONT_STACKS[fontStackName]);
+
+          try {
+            const contextBuilder: ContextBuilder =
+              backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
+            testFunc(options, contextBuilder);
+          } finally {
+            // Restore original font
+            Flow.setMusicFont(...originalFontNames);
+            // Don't remove the element so we can see rendered output
+            // element.remove();
+          }
+        });
+      });
+    });
+  }
+
+  runTest('Major Key Clef Test', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const w = fontWidths();
     const accidentalCount = 28; // total number in all the keys
@@ -66,9 +87,8 @@ describe('Clef Keys', () => {
       'percussion',
     ];
 
-    const elementId = createTestElement();
-    const ctx = Renderer.getCanvasContext(
-      elementId,
+    const ctx = contextBuilder(
+      options.elementId,
       Math.max(sharpTestWidth, flatTestWidth) + 100,
       20 + 80 * 2 * clefs.length
     );
@@ -110,7 +130,7 @@ describe('Clef Keys', () => {
     assert.ok(true, 'all pass');
   });
 
-  test('Minor Key Clef Test', () => {
+  runTest('Minor Key Clef Test', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const w = fontWidths();
     const accidentalCount = 28; // total number in all the keys
@@ -130,9 +150,8 @@ describe('Clef Keys', () => {
       'percussion',
     ];
 
-    const elementId = createTestElement();
-    const ctx = Renderer.getCanvasContext(
-      elementId,
+    const ctx = contextBuilder(
+      options.elementId,
       Math.max(sharpTestWidth, flatTestWidth) + 100,
       20 + 80 * 2 * clefs.length
     );
@@ -174,15 +193,14 @@ describe('Clef Keys', () => {
     assert.ok(true, 'all pass');
   });
 
-  test('Stave Helper', () => {
+  runTest('Stave Helper', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const w = fontWidths();
     const accidentalCount = 28; // total number in all the keys
     const sharpTestWidth = accidentalCount * w.sharpWidth + w.clefWidth + Stave.defaultPadding + 7 * w.ksPadding;
     const flatTestWidth = accidentalCount * w.flatWidth + w.clefWidth + Stave.defaultPadding + 7 * w.ksPadding;
 
-    const elementId = createTestElement();
-    const ctx = Renderer.getCanvasContext(elementId, Math.max(sharpTestWidth, flatTestWidth) + 100, 400);
+    const ctx = contextBuilder(options.elementId, Math.max(sharpTestWidth, flatTestWidth) + 100, 400);
     const stave1 = new Stave(10, 10, flatTestWidth);
     const stave2 = new Stave(10, 90, flatTestWidth);
     const stave3 = new Stave(10, 170, sharpTestWidth);

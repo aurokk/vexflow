@@ -6,7 +6,7 @@
 // TODO: In StaveNote.preFormat() line 929, should noteHeadPadding default to StaveNote.minNoteheadPadding?
 //       The bounding box of a note changes slightly when we add a ModifierContext (even if we add zero modifiers).
 
-import { afterAll, beforeAll, describe, test } from 'vitest';
+import { describe, test } from 'vitest';
 
 import { Accidental } from '../src/accidental';
 import { Annotation, AnnotationVerticalJustify } from '../src/annotation';
@@ -27,18 +27,7 @@ import { Stem } from '../src/stem';
 import { StringNumber } from '../src/stringnumber';
 import { Stroke } from '../src/strokes';
 import { TickContext } from '../src/tickcontext';
-import { createAssert, FONT_STACKS, makeFactory } from './vitest_test_helpers';
-
-// Helper function to create test elements
-function createTestElement(id: string): HTMLCanvasElement | HTMLDivElement {
-  let element = document.getElementById(id);
-  if (!element) {
-    element = document.createElement('canvas') as HTMLCanvasElement;
-    element.id = id;
-    document.body.appendChild(element);
-  }
-  return element as HTMLCanvasElement;
-}
+import { createAssert, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
 
 // Helper function to create StaveNotes.
 const staveNote = (struct: StaveNoteStruct) => new StaveNote(struct);
@@ -76,20 +65,57 @@ function draw(
 }
 
 describe('StaveNote', () => {
-  let originalFontNames: string[];
+  // Helper function to run a test with multiple backends and font stacks
+  function runTest(
+    testName: string,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    backends: Array<{ backend: number; fontStacks: string[] }> = [
+      { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
+      { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
+    ]
+  ) {
+    backends.forEach(({ backend, fontStacks }) => {
+      fontStacks.forEach((fontStackName) => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+          const elementId = generateTestID('stavenote_test');
 
-  beforeAll(async () => {
-    originalFontNames = Flow.getMusicFont();
-    Flow.setMusicFont(...FONT_STACKS['Bravura']);
-  });
+          // Create the DOM element before the test runs
+          const tagName = backend === Renderer.Backends.SVG ? 'div' : 'canvas';
+          const element = document.createElement(tagName);
+          element.id = elementId;
+          document.body.appendChild(element);
 
-  afterAll(() => {
-    Flow.setMusicFont(...originalFontNames);
-  });
+          const assert = createAssert();
+          const options: TestOptions = { elementId, params: {}, backend };
+
+          // Set font stack
+          const originalFontNames = Flow.getMusicFont();
+          Flow.setMusicFont(...FONT_STACKS[fontStackName]);
+
+          try {
+            const contextBuilder: ContextBuilder =
+              backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
+            testFunc(options, contextBuilder);
+          } finally {
+            // Restore original font
+            Flow.setMusicFont(...originalFontNames);
+            // Don't remove the element so we can see rendered output
+            // element.remove();
+          }
+        });
+      });
+    });
+  }
 
   test('Tick', () => {
     const assert = createAssert();
-    const BEAT = (1 * Flow.RESOLUTION) / 4;
+
+    // Set up font for unit test
+    const originalFontNames = Flow.getMusicFont();
+    Flow.setMusicFont(...FONT_STACKS['Bravura']);
+
+    try {
+      const BEAT = (1 * Flow.RESOLUTION) / 4;
 
     // Key value pairs of `testName: [durationString, expectedBeats, expectedNoteType]`
     const tickTests: Record<string, [string, number, string]> = {
@@ -120,16 +146,26 @@ describe('StaveNote', () => {
       assert.equal(note.getNoteType(), expectedNoteType, 'Note type must be ' + expectedNoteType);
     });
 
-    assert.throws(() => new StaveNote({ keys: ['c/4', 'e/4', 'g/4'], duration: '8.7dddm' }), /BadArguments/);
+      assert.throws(() => new StaveNote({ keys: ['c/4', 'e/4', 'g/4'], duration: '8.7dddm' }), /BadArguments/);
 
-    assert.throws(() => new StaveNote({ keys: ['c/4', 'e/4', 'g/4'], duration: '2Z' }), /BadArguments/);
+      assert.throws(() => new StaveNote({ keys: ['c/4', 'e/4', 'g/4'], duration: '2Z' }), /BadArguments/);
 
-    assert.throws(() => new StaveNote({ keys: ['c/4', 'e/4', 'g/4'], duration: '2dddZ' }), /BadArguments/);
+      assert.throws(() => new StaveNote({ keys: ['c/4', 'e/4', 'g/4'], duration: '2dddZ' }), /BadArguments/);
+    } finally {
+      // Restore original font
+      Flow.setMusicFont(...originalFontNames);
+    }
   });
 
   test('Tick - New API', () => {
     const assert = createAssert();
-    const BEAT = (1 * Flow.RESOLUTION) / 4;
+
+    // Set up font for unit test
+    const originalFontNames = Flow.getMusicFont();
+    Flow.setMusicFont(...FONT_STACKS['Bravura']);
+
+    try {
+      const BEAT = (1 * Flow.RESOLUTION) / 4;
 
     // Key value pairs of `testName: [noteData, expectedBeats, expectedNoteType]`
     const tickTests: Record<string, [StaveNoteStruct, number, string]> = {
@@ -163,44 +199,74 @@ describe('StaveNote', () => {
       assert.equal(note.getNoteType(), expectedNoteType, 'Note type must be ' + expectedNoteType);
     });
 
-    assert.throws(() => new StaveNote({ keys: ['c/4', 'e/4', 'g/4'], duration: '8.7dddm' }), /BadArguments/);
+      assert.throws(() => new StaveNote({ keys: ['c/4', 'e/4', 'g/4'], duration: '8.7dddm' }), /BadArguments/);
 
-    assert.throws(() => new StaveNote({ keys: ['c/4', 'e/4', 'g/4'], duration: '2Z' }), /BadArguments/);
+      assert.throws(() => new StaveNote({ keys: ['c/4', 'e/4', 'g/4'], duration: '2Z' }), /BadArguments/);
 
-    assert.throws(() => new StaveNote({ keys: ['c/4', 'e/4', 'g/4'], duration: '2dddZ' }), /BadArguments/);
+      assert.throws(() => new StaveNote({ keys: ['c/4', 'e/4', 'g/4'], duration: '2dddZ' }), /BadArguments/);
+    } finally {
+      // Restore original font
+      Flow.setMusicFont(...originalFontNames);
+    }
   });
 
   test('Stem', () => {
     const assert = createAssert();
-    const note = new StaveNote({ keys: ['c/4', 'e/4', 'g/4'], duration: 'w' });
-    assert.equal(note.getStemDirection(), Stem.UP, 'Default note has UP stem');
+
+    // Set up font for unit test
+    const originalFontNames = Flow.getMusicFont();
+    Flow.setMusicFont(...FONT_STACKS['Bravura']);
+
+    try {
+      const note = new StaveNote({ keys: ['c/4', 'e/4', 'g/4'], duration: 'w' });
+      assert.equal(note.getStemDirection(), Stem.UP, 'Default note has UP stem');
+    } finally {
+      // Restore original font
+      Flow.setMusicFont(...originalFontNames);
+    }
   });
 
   test('Automatic Stem Direction', () => {
     const assert = createAssert();
-    const testData: [/* keys */ string[], /* expectedStemDirection */ number][] = [
-      [['c/5', 'e/5', 'g/5'], Stem.DOWN],
-      [['e/4', 'g/4', 'c/5'], Stem.UP],
-      [['c/5'], Stem.DOWN],
-      [['a/4', 'e/5', 'g/5'], Stem.DOWN],
-      [['b/4'], Stem.DOWN],
-    ];
-    testData.forEach((td) => {
-      const keys = td[0];
-      const expectedStemDirection = td[1];
-      const note = new StaveNote({ keys: keys, auto_stem: true, duration: '8' });
-      assert.equal(
-        note.getStemDirection(),
-        expectedStemDirection,
-        'Stem must be ' + (expectedStemDirection === Stem.UP ? 'up' : 'down')
-      );
-    });
+
+    // Set up font for unit test
+    const originalFontNames = Flow.getMusicFont();
+    Flow.setMusicFont(...FONT_STACKS['Bravura']);
+
+    try {
+      const testData: [/* keys */ string[], /* expectedStemDirection */ number][] = [
+        [['c/5', 'e/5', 'g/5'], Stem.DOWN],
+        [['e/4', 'g/4', 'c/5'], Stem.UP],
+        [['c/5'], Stem.DOWN],
+        [['a/4', 'e/5', 'g/5'], Stem.DOWN],
+        [['b/4'], Stem.DOWN],
+      ];
+      testData.forEach((td) => {
+        const keys = td[0];
+        const expectedStemDirection = td[1];
+        const note = new StaveNote({ keys: keys, auto_stem: true, duration: '8' });
+        assert.equal(
+          note.getStemDirection(),
+          expectedStemDirection,
+          'Stem must be ' + (expectedStemDirection === Stem.UP ? 'up' : 'down')
+        );
+      });
+    } finally {
+      // Restore original font
+      Flow.setMusicFont(...originalFontNames);
+    }
   });
 
   test('Stem Extension Pitch', () => {
     const assert = createAssert();
-    // [keys, expectedStemExtension, override stem direction]
-    const testData: [string[], number, number][] = [
+
+    // Set up font for unit test
+    const originalFontNames = Flow.getMusicFont();
+    Flow.setMusicFont(...FONT_STACKS['Bravura']);
+
+    try {
+      // [keys, expectedStemExtension, override stem direction]
+      const testData: [string[], number, number][] = [
       [['c/5', 'e/5', 'g/5'], 0, 0],
       [['e/4', 'g/4', 'c/5'], 0, 0],
       [['c/5'], 0, 0],
@@ -242,75 +308,112 @@ describe('StaveNote', () => {
       //      -1 * Flow.STEM_HEIGHT,
       //      'For ' + keys.toString() + ' whole_note StemExtension must always be -1 * Flow.STEM_HEIGHT'
       //    );
-    });
+      });
+    } finally {
+      // Restore original font
+      Flow.setMusicFont(...originalFontNames);
+    }
   });
 
   test('Displacement after calling setStemDirection', () => {
     const assert = createAssert();
-    function getDisplacements(note: StaveNote) {
-      return note.noteHeads.map((noteHead) => noteHead.isDisplaced());
+
+    // Set up font for unit test
+    const originalFontNames = Flow.getMusicFont();
+    Flow.setMusicFont(...FONT_STACKS['Bravura']);
+
+    try {
+      function getDisplacements(note: StaveNote) {
+        return note.noteHeads.map((noteHead) => noteHead.isDisplaced());
+      }
+
+      const stemUpDisplacements = [false, true, false];
+      const stemDownDisplacements = [true, false, false];
+
+      const note = new StaveNote({ keys: ['c/5', 'd/5', 'g/5'], stem_direction: Stem.UP, duration: '4' });
+      assert.propEqual(getDisplacements(note), stemUpDisplacements);
+      note.setStemDirection(Stem.DOWN);
+      assert.propEqual(getDisplacements(note), stemDownDisplacements);
+      note.setStemDirection(Stem.UP);
+      assert.propEqual(getDisplacements(note), stemUpDisplacements);
+    } finally {
+      // Restore original font
+      Flow.setMusicFont(...originalFontNames);
     }
-
-    const stemUpDisplacements = [false, true, false];
-    const stemDownDisplacements = [true, false, false];
-
-    const note = new StaveNote({ keys: ['c/5', 'd/5', 'g/5'], stem_direction: Stem.UP, duration: '4' });
-    assert.propEqual(getDisplacements(note), stemUpDisplacements);
-    note.setStemDirection(Stem.DOWN);
-    assert.propEqual(getDisplacements(note), stemDownDisplacements);
-    note.setStemDirection(Stem.UP);
-    assert.propEqual(getDisplacements(note), stemUpDisplacements);
   });
 
   test('StaveLine', () => {
     const assert = createAssert();
-    const stave = new Stave(10, 10, 300);
-    const note = new StaveNote({ keys: ['c/4', 'e/4', 'a/4'], duration: 'w' });
-    note.setStave(stave);
 
-    const props = note.getKeyProps();
-    assert.equal(props[0].line, 0, 'C/4 on line 0');
-    assert.equal(props[1].line, 1, 'E/4 on line 1');
-    assert.equal(props[2].line, 2.5, 'A/4 on line 2.5');
+    // Set up font for unit test
+    const originalFontNames = Flow.getMusicFont();
+    Flow.setMusicFont(...FONT_STACKS['Bravura']);
 
-    const ys = note.getYs();
-    assert.equal(ys.length, 3, 'Chord should be rendered on three lines');
-    assert.equal(ys[0], 100, 'Line for C/4');
-    assert.equal(ys[1], 90, 'Line for E/4');
-    assert.equal(ys[2], 75, 'Line for A/4');
+    try {
+      const stave = new Stave(10, 10, 300);
+      const note = new StaveNote({ keys: ['c/4', 'e/4', 'a/4'], duration: 'w' });
+      note.setStave(stave);
+
+      const props = note.getKeyProps();
+      assert.equal(props[0].line, 0, 'C/4 on line 0');
+      assert.equal(props[1].line, 1, 'E/4 on line 1');
+      assert.equal(props[2].line, 2.5, 'A/4 on line 2.5');
+
+      const ys = note.getYs();
+      assert.equal(ys.length, 3, 'Chord should be rendered on three lines');
+      assert.equal(ys[0], 100, 'Line for C/4');
+      assert.equal(ys[1], 90, 'Line for E/4');
+      assert.equal(ys[2], 75, 'Line for A/4');
+    } finally {
+      // Restore original font
+      Flow.setMusicFont(...originalFontNames);
+    }
   });
 
   test('Width', () => {
     const assert = createAssert();
-    const note = new StaveNote({ keys: ['c/4', 'e/4', 'a/4'], duration: 'w' });
-    assert.throws(() => note.getWidth(), /UnformattedNote/);
+
+    // Set up font for unit test
+    const originalFontNames = Flow.getMusicFont();
+    Flow.setMusicFont(...FONT_STACKS['Bravura']);
+
+    try {
+      const note = new StaveNote({ keys: ['c/4', 'e/4', 'a/4'], duration: 'w' });
+      assert.throws(() => note.getWidth(), /UnformattedNote/);
+    } finally {
+      // Restore original font
+      Flow.setMusicFont(...originalFontNames);
+    }
   });
 
   test('TickContext', () => {
     const assert = createAssert();
-    const stave = new Stave(10, 10, 400);
-    const note = new StaveNote({ keys: ['c/4', 'e/4', 'a/4'], duration: 'w' }).setStave(stave);
 
-    new TickContext().addTickable(note).preFormat().setX(10).setPadding(0);
+    // Set up font for unit test
+    const originalFontNames = Flow.getMusicFont();
+    Flow.setMusicFont(...FONT_STACKS['Bravura']);
 
-    // No assertions - just checking that it doesn't throw
+    try {
+      const stave = new Stave(10, 10, 400);
+      const note = new StaveNote({ keys: ['c/4', 'e/4', 'a/4'], duration: 'w' }).setStave(stave);
+
+      new TickContext().addTickable(note).preFormat().setX(10).setPadding(0);
+
+      // No assertions - just checking that it doesn't throw
+    } finally {
+      // Restore original font
+      Flow.setMusicFont(...originalFontNames);
+    }
   });
 
-  test('StaveNote Draw - Treble', () => {
+  runTest('StaveNote Draw - Treble', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = 'stavenote-treble';
-    createTestElement(elementId);
-    const contextBuilder = (id: string, width: number, height: number) => {
-      const renderer = new Renderer(id, Renderer.Backends.SVG);
-      renderer.resize(width, height);
-      return renderer.getContext();
-    };
 
     const clef = 'treble';
     const octaveShift = 0;
     const restKey = 'r/4';
 
-    const ctx = contextBuilder(elementId, 700, 180);
+    const ctx = contextBuilder(options.elementId, 700, 180);
     const stave = new Stave(10, 30, 750);
     stave.setContext(ctx);
     stave.addClef(clef);
@@ -365,21 +468,14 @@ describe('StaveNote', () => {
     }
   });
 
-  test('StaveNote BoundingBoxes - Treble', () => {
+  runTest('StaveNote BoundingBoxes - Treble', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = 'stavenote-boundingboxes-treble';
-    createTestElement(elementId);
-    const contextBuilder = (id: string, width: number, height: number) => {
-      const renderer = new Renderer(id, Renderer.Backends.SVG);
-      renderer.resize(width, height);
-      return renderer.getContext();
-    };
 
     const clef = 'treble';
     const octaveShift = 0;
     const restKey = 'r/4';
 
-    const ctx = contextBuilder(elementId, 700, 180);
+    const ctx = contextBuilder(options.elementId, 700, 180);
     const stave = new Stave(10, 30, 750);
     stave.setContext(ctx);
     stave.addClef(clef);
@@ -441,21 +537,14 @@ describe('StaveNote', () => {
     }
   });
 
-  test('StaveNote Draw - Alto', () => {
+  runTest('StaveNote Draw - Alto', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = 'stavenote-alto';
-    createTestElement(elementId);
-    const contextBuilder = (id: string, width: number, height: number) => {
-      const renderer = new Renderer(id, Renderer.Backends.SVG);
-      renderer.resize(width, height);
-      return renderer.getContext();
-    };
 
     const clef = 'alto';
     const octaveShift = -1;
     const restKey = 'r/4';
 
-    const ctx = contextBuilder(elementId, 700, 180);
+    const ctx = contextBuilder(options.elementId, 700, 180);
     const stave = new Stave(10, 30, 750);
     stave.setContext(ctx);
     stave.addClef(clef);
@@ -510,21 +599,14 @@ describe('StaveNote', () => {
     }
   });
 
-  test('StaveNote Draw - Tenor', () => {
+  runTest('StaveNote Draw - Tenor', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = 'stavenote-tenor';
-    createTestElement(elementId);
-    const contextBuilder = (id: string, width: number, height: number) => {
-      const renderer = new Renderer(id, Renderer.Backends.SVG);
-      renderer.resize(width, height);
-      return renderer.getContext();
-    };
 
     const clef = 'tenor';
     const octaveShift = -1;
     const restKey = 'r/3';
 
-    const ctx = contextBuilder(elementId, 700, 180);
+    const ctx = contextBuilder(options.elementId, 700, 180);
     const stave = new Stave(10, 30, 750);
     stave.setContext(ctx);
     stave.addClef(clef);
@@ -579,21 +661,14 @@ describe('StaveNote', () => {
     }
   });
 
-  test('StaveNote Draw - Bass', () => {
+  runTest('StaveNote Draw - Bass', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = 'stavenote-bass';
-    createTestElement(elementId);
-    const contextBuilder = (id: string, width: number, height: number) => {
-      const renderer = new Renderer(id, Renderer.Backends.SVG);
-      renderer.resize(width, height);
-      return renderer.getContext();
-    };
 
     const clef = 'bass';
     const octaveShift = -2;
     const restKey = 'r/3';
 
-    const ctx = contextBuilder(elementId, 700, 180);
+    const ctx = contextBuilder(options.elementId, 700, 180);
     const stave = new Stave(10, 30, 750);
     stave.setContext(ctx);
     stave.addClef(clef);
@@ -648,17 +723,10 @@ describe('StaveNote', () => {
     }
   });
 
-  test('StaveNote Draw - Harmonic And Muted', () => {
+  runTest('StaveNote Draw - Harmonic And Muted', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = 'stavenote-harmonic-muted';
-    createTestElement(elementId);
-    const contextBuilder = (id: string, width: number, height: number) => {
-      const renderer = new Renderer(id, Renderer.Backends.SVG);
-      renderer.resize(width, height);
-      return renderer.getContext();
-    };
 
-    const ctx = contextBuilder(elementId, 1000, 180);
+    const ctx = contextBuilder(options.elementId, 1000, 180);
     const stave = new Stave(10, 10, 950);
     stave.setContext(ctx);
     stave.draw();
@@ -711,17 +779,10 @@ describe('StaveNote', () => {
     }
   });
 
-  test('StaveNote Draw - Slash', () => {
+  runTest('StaveNote Draw - Slash', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = 'stavenote-slash';
-    createTestElement(elementId);
-    const contextBuilder = (id: string, width: number, height: number) => {
-      const renderer = new Renderer(id, Renderer.Backends.SVG);
-      renderer.resize(width, height);
-      return renderer.getContext();
-    };
 
-    const ctx = contextBuilder(elementId, 700, 180);
+    const ctx = contextBuilder(options.elementId, 700, 180);
     const stave = new Stave(10, 10, 650);
     stave.setContext(ctx);
     stave.draw();
@@ -766,17 +827,10 @@ describe('StaveNote', () => {
     assert.ok('Slash Note Heads');
   });
 
-  test('Displacements', () => {
+  runTest('Displacements', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = 'stavenote-displacements';
-    createTestElement(elementId);
-    const contextBuilder = (id: string, width: number, height: number) => {
-      const renderer = new Renderer(id, Renderer.Backends.SVG);
-      renderer.resize(width, height);
-      return renderer.getContext();
-    };
 
-    const ctx = contextBuilder(elementId, 700, 155);
+    const ctx = contextBuilder(options.elementId, 700, 155);
     ctx.scale(0.9, 0.9);
 
     const stave = new Stave(10, 10, 675);
@@ -812,17 +866,10 @@ describe('StaveNote', () => {
     }
   });
 
-  test('StaveNote Draw - Bass 2', () => {
+  runTest('StaveNote Draw - Bass 2', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = 'stavenote-bass2';
-    createTestElement(elementId);
-    const contextBuilder = (id: string, width: number, height: number) => {
-      const renderer = new Renderer(id, Renderer.Backends.SVG);
-      renderer.resize(width, height);
-      return renderer.getContext();
-    };
 
-    const ctx = contextBuilder(elementId, 600, 280);
+    const ctx = contextBuilder(options.elementId, 600, 280);
     const stave = new Stave(10, 10, 650);
     stave.setContext(ctx);
     stave.addClef('bass');
@@ -860,17 +907,10 @@ describe('StaveNote', () => {
     }
   });
 
-  test('StaveNote Draw - Key Styles', () => {
+  runTest('StaveNote Draw - Key Styles', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = 'stavenote-keystyles';
-    createTestElement(elementId);
-    const contextBuilder = (id: string, width: number, height: number) => {
-      const renderer = new Renderer(id, Renderer.Backends.SVG);
-      renderer.resize(width, height);
-      return renderer.getContext();
-    };
 
-    const ctx = contextBuilder(elementId, 300, 280);
+    const ctx = contextBuilder(options.elementId, 300, 280);
     ctx.scale(3, 3);
 
     const stave = new Stave(10, 0, 100);
@@ -889,17 +929,10 @@ describe('StaveNote', () => {
     assert.ok(note.getYs().length > 0, 'Note has Y values');
   });
 
-  test('StaveNote Draw - StaveNote Stem Styles', () => {
+  runTest('StaveNote Draw - StaveNote Stem Styles', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = 'stavenote-stem-styles';
-    createTestElement(elementId);
-    const contextBuilder = (id: string, width: number, height: number) => {
-      const renderer = new Renderer(id, Renderer.Backends.SVG);
-      renderer.resize(width, height);
-      return renderer.getContext();
-    };
 
-    const ctx = contextBuilder(elementId, 300, 280);
+    const ctx = contextBuilder(options.elementId, 300, 280);
     const stave = new Stave(10, 0, 100);
     ctx.scale(3, 3);
 
@@ -917,17 +950,10 @@ describe('StaveNote', () => {
     assert.ok('Note Stem Style');
   });
 
-  test('StaveNote Draw - StaveNote Stem Lengths', () => {
+  runTest('StaveNote Draw - StaveNote Stem Lengths', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = 'stavenote-stem-lengths';
-    createTestElement(elementId);
-    const contextBuilder = (id: string, width: number, height: number) => {
-      const renderer = new Renderer(id, Renderer.Backends.SVG);
-      renderer.resize(width, height);
-      return renderer.getContext();
-    };
 
-    const ctx = contextBuilder(elementId, 975, 150);
+    const ctx = contextBuilder(options.elementId, 975, 150);
     const stave = new Stave(10, 10, 975);
     stave.setContext(ctx).draw();
 
@@ -980,17 +1006,10 @@ describe('StaveNote', () => {
     assert.ok('Note Stem Length');
   });
 
-  test('StaveNote Draw - StaveNote Flag Styles', () => {
+  runTest('StaveNote Draw - StaveNote Flag Styles', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = 'stavenote-flag-styles';
-    createTestElement(elementId);
-    const contextBuilder = (id: string, width: number, height: number) => {
-      const renderer = new Renderer(id, Renderer.Backends.SVG);
-      renderer.resize(width, height);
-      return renderer.getContext();
-    };
 
-    const ctx = contextBuilder(elementId, 300, 280);
+    const ctx = contextBuilder(options.elementId, 300, 280);
     const stave = new Stave(10, 0, 100);
     ctx.scale(3, 3);
 
@@ -1009,17 +1028,10 @@ describe('StaveNote', () => {
     assert.ok(note.getYs().length > 0, 'Note has Y values');
   });
 
-  test('StaveNote Draw - StaveNote Styles', () => {
+  runTest('StaveNote Draw - StaveNote Styles', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = 'stavenote-styles';
-    createTestElement(elementId);
-    const contextBuilder = (id: string, width: number, height: number) => {
-      const renderer = new Renderer(id, Renderer.Backends.SVG);
-      renderer.resize(width, height);
-      return renderer.getContext();
-    };
 
-    const ctx = contextBuilder(elementId, 300, 280);
+    const ctx = contextBuilder(options.elementId, 300, 280);
     const stave = new Stave(10, 0, 100);
     ctx.scale(3, 3);
 
@@ -1038,17 +1050,10 @@ describe('StaveNote', () => {
     assert.ok(note.getYs().length > 0, 'Note has Y values');
   });
 
-  test('Stave, Ledger Line, Beam, Stem and Flag Styles', () => {
+  runTest('Stave, Ledger Line, Beam, Stem and Flag Styles', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = 'stavenote-beam-styles';
-    createTestElement(elementId);
-    const contextBuilder = (id: string, width: number, height: number) => {
-      const renderer = new Renderer(id, Renderer.Backends.SVG);
-      renderer.resize(width, height);
-      return renderer.getContext();
-    };
 
-    const ctx = contextBuilder(elementId, 400, 160);
+    const ctx = contextBuilder(options.elementId, 400, 160);
     const stave = new Stave(10, 10, 380);
     stave.setStyle({ strokeStyle: '#EEAAEE', lineWidth: 3 });
     stave.setContext(ctx);
@@ -1113,17 +1118,10 @@ describe('StaveNote', () => {
     assert.ok('draw beam styles');
   });
 
-  test('Flag and Dot Placement - Stem Up', () => {
+  runTest('Flag and Dot Placement - Stem Up', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = 'stavenote-flags-dots-up';
-    createTestElement(elementId);
-    const contextBuilder = (id: string, width: number, height: number) => {
-      const renderer = new Renderer(id, Renderer.Backends.SVG);
-      renderer.resize(width, height);
-      return renderer.getContext();
-    };
 
-    const ctx = contextBuilder(elementId, 800, 150);
+    const ctx = contextBuilder(options.elementId, 800, 150);
     ctx.scale(1.0, 1.0);
 
     const stave = new Stave(10, 10, 975);
@@ -1154,17 +1152,10 @@ describe('StaveNote', () => {
     assert.ok(true, 'Full Dot');
   });
 
-  test('Flag and Dots Placement - Stem Down', () => {
+  runTest('Flag and Dots Placement - Stem Down', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = 'stavenote-flags-dots-down';
-    createTestElement(elementId);
-    const contextBuilder = (id: string, width: number, height: number) => {
-      const renderer = new Renderer(id, Renderer.Backends.SVG);
-      renderer.resize(width, height);
-      return renderer.getContext();
-    };
 
-    const ctx = contextBuilder(elementId, 800, 160);
+    const ctx = contextBuilder(options.elementId, 800, 160);
     ctx.scale(1.0, 1.0);
 
     const stave = new Stave(10, 10, 975);
@@ -1194,17 +1185,10 @@ describe('StaveNote', () => {
     assert.ok(true, 'Full Dot');
   });
 
-  test('Beam and Dot Placement - Stem Up', () => {
+  runTest('Beam and Dot Placement - Stem Up', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = 'stavenote-beams-dots-up';
-    createTestElement(elementId);
-    const contextBuilder = (id: string, width: number, height: number) => {
-      const renderer = new Renderer(id, Renderer.Backends.SVG);
-      renderer.resize(width, height);
-      return renderer.getContext();
-    };
 
-    const ctx = contextBuilder(elementId, 800, 150);
+    const ctx = contextBuilder(options.elementId, 800, 150);
     ctx.scale(1.0, 1.0);
 
     const stave = new Stave(10, 10, 975);
@@ -1237,17 +1221,10 @@ describe('StaveNote', () => {
     assert.ok(true, 'Full Dot');
   });
 
-  test('Beam and Dot Placement - Stem Down', () => {
+  runTest('Beam and Dot Placement - Stem Down', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = 'stavenote-beams-dots-down';
-    createTestElement(elementId);
-    const contextBuilder = (id: string, width: number, height: number) => {
-      const renderer = new Renderer(id, Renderer.Backends.SVG);
-      renderer.resize(width, height);
-      return renderer.getContext();
-    };
 
-    const ctx = contextBuilder(elementId, 800, 160);
+    const ctx = contextBuilder(options.elementId, 800, 160);
     ctx.scale(1.0, 1.0);
 
     const stave = new Stave(10, 10, 975);
@@ -1279,11 +1256,9 @@ describe('StaveNote', () => {
     assert.ok(true, 'Full Dot');
   });
 
-  test('No Padding', () => {
+  runTest('No Padding', (options: TestOptions) => {
     const assert = createAssert();
-    const elementId = 'stavenote-no-padding';
-    createTestElement(elementId);
-    const vf = makeFactory(Renderer.Backends.SVG, elementId, 800, 500);
+    const vf = makeFactory(options.backend, options.elementId, 800, 500);
     const score = vf.EasyScore();
 
     function newStave(y: number, noPadding: boolean): void {
@@ -1319,11 +1294,9 @@ describe('StaveNote', () => {
     vf.draw();
   });
 
-  test('Note Heads Placement - Simple', () => {
+  runTest('Note Heads Placement - Simple', (options: TestOptions) => {
     const assert = createAssert();
-    const elementId = 'stavenote-noteheads-simple';
-    createTestElement(elementId);
-    const vf = makeFactory(Renderer.Backends.SVG, elementId, 800, 250);
+    const vf = makeFactory(options.backend, options.elementId, 800, 250);
     const score = vf.EasyScore();
 
     const system1 = vf.System({ y: 100, x: 50, width: 200 });
@@ -1358,11 +1331,9 @@ describe('StaveNote', () => {
     vf.draw();
   });
 
-  test('Note Heads Placement - Hidden Notes', () => {
+  runTest('Note Heads Placement - Hidden Notes', (options: TestOptions) => {
     const assert = createAssert();
-    const elementId = 'stavenote-noteheads-hidden';
-    createTestElement(elementId);
-    const vf = makeFactory(Renderer.Backends.SVG, elementId, 800, 250);
+    const vf = makeFactory(options.backend, options.elementId, 800, 250);
     const score = vf.EasyScore();
 
     const system1 = vf.System({ y: 100, x: 50, width: 200 });
@@ -1401,11 +1372,9 @@ describe('StaveNote', () => {
     vf.draw();
   });
 
-  test('Center Aligned Note', () => {
+  runTest('Center Aligned Note', (options: TestOptions) => {
     const assert = createAssert();
-    const elementId = 'stavenote-center-aligned';
-    createTestElement(elementId);
-    const f = makeFactory(Renderer.Backends.SVG, elementId, 400, 160);
+    const f = makeFactory(options.backend, options.elementId, 400, 160);
     const stave = f.Stave({ x: 10, y: 10, width: 350 }).addClef('treble').addTimeSignature('4/4');
     const note = f.StaveNote({ keys: ['b/4'], duration: '1r', align_center: true });
     const voice = f.Voice().setStrict(false).addTickables([note]);
@@ -1414,11 +1383,9 @@ describe('StaveNote', () => {
     assert.ok(true);
   });
 
-  test('Center Aligned Note with Articulation', () => {
+  runTest('Center Aligned Note with Articulation', (options: TestOptions) => {
     const assert = createAssert();
-    const elementId = 'stavenote-center-aligned-fermata';
-    createTestElement(elementId);
-    const f = makeFactory(Renderer.Backends.SVG, elementId, 400, 160);
+    const f = makeFactory(options.backend, options.elementId, 400, 160);
 
     const stave = f.Stave({ x: 10, y: 10, width: 350 }).addClef('treble').addTimeSignature('4/4');
 
@@ -1435,11 +1402,9 @@ describe('StaveNote', () => {
     assert.ok(true);
   });
 
-  test('Center Aligned Note with Annotation', () => {
+  runTest('Center Aligned Note with Annotation', (options: TestOptions) => {
     const assert = createAssert();
-    const elementId = 'stavenote-center-aligned-annotation';
-    createTestElement(elementId);
-    const f = makeFactory(Renderer.Backends.SVG, elementId, 400, 160);
+    const f = makeFactory(options.backend, options.elementId, 400, 160);
 
     const stave = f.Stave({ x: 10, y: 10, width: 350 }).addClef('treble').addTimeSignature('4/4');
 
@@ -1456,11 +1421,9 @@ describe('StaveNote', () => {
     assert.ok(true);
   });
 
-  test('Center Aligned Note - Multi Voice', () => {
+  runTest('Center Aligned Note - Multi Voice', (options: TestOptions) => {
     const assert = createAssert();
-    const elementId = 'stavenote-center-aligned-multivoice';
-    createTestElement(elementId);
-    const f = makeFactory(Renderer.Backends.SVG, elementId, 400, 160);
+    const f = makeFactory(options.backend, options.elementId, 400, 160);
 
     const stave = f.Stave({ x: 10, y: 10, width: 350 }).addClef('treble').addTimeSignature('3/8');
 
@@ -1497,11 +1460,9 @@ describe('StaveNote', () => {
     assert.ok(true);
   });
 
-  test('Center Aligned Note with Multiple Modifiers', () => {
+  runTest('Center Aligned Note with Multiple Modifiers', (options: TestOptions) => {
     const assert = createAssert();
-    const elementId = 'stavenote-center-aligned-multi-modifiers';
-    createTestElement(elementId);
-    const f = makeFactory(Renderer.Backends.SVG, elementId, 400, 160);
+    const f = makeFactory(options.backend, options.elementId, 400, 160);
 
     const stave = f.Stave({ x: 10, y: 10, width: 350 }).addClef('treble').addTimeSignature('4/4');
 

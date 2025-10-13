@@ -3,7 +3,7 @@
 //
 // Dot Tests - Vitest Version
 
-import { afterAll, beforeAll, describe, test } from 'vitest';
+import { describe, test } from 'vitest';
 
 import { Beam } from '../src/beam';
 import { Dot } from '../src/dot';
@@ -12,23 +12,12 @@ import { Formatter } from '../src/formatter';
 import { ModifierContext } from '../src/modifiercontext';
 import { Note } from '../src/note';
 import { RenderContext } from '../src/rendercontext';
-import { Renderer } from '../src/renderer';
+import { ContextBuilder, Renderer } from '../src/renderer';
 import { Stave } from '../src/stave';
 import { StaveNote } from '../src/stavenote';
 import { TickContext } from '../src/tickcontext';
 import { Voice } from '../src/voice';
-import { createAssert, FONT_STACKS, plotLegendForNoteWidth } from './vitest_test_helpers';
-
-/**
- * Helper to create a unique element ID and DOM element for testing
- */
-function createTestElement() {
-  const elementId = 'test_' + Date.now() + '_' + Math.random();
-  const element = document.createElement('canvas');
-  element.id = elementId;
-  document.body.appendChild(element);
-  return elementId;
-}
+import { createAssert, FONT_STACKS, generateTestID, plotLegendForNoteWidth, TestOptions } from './vitest_test_helpers';
 
 /**
  * Helper function for the basic test case below.
@@ -42,23 +31,50 @@ function showOneNote(note1: StaveNote, stave: Stave, ctx: RenderContext, x: numb
 }
 
 describe('Dot', () => {
-  let originalFontNames: string[];
+  // Helper function to run a test with multiple backends and font stacks
+  function runTest(
+    testName: string,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    backends: Array<{ backend: number; fontStacks: string[] }> = [
+      { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
+      { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
+    ]
+  ) {
+    backends.forEach(({ backend, fontStacks }) => {
+      fontStacks.forEach((fontStackName) => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+          const elementId = generateTestID('dot_test');
 
-  beforeAll(async () => {
-    originalFontNames = Flow.getMusicFont();
-    Flow.setMusicFont(...FONT_STACKS['Bravura']);
-  });
+          // Create the DOM element before the test runs
+          const tagName = backend === Renderer.Backends.SVG ? 'div' : 'canvas';
+          const element = document.createElement(tagName);
+          element.id = elementId;
+          document.body.appendChild(element);
 
-  afterAll(() => {
-    Flow.setMusicFont(...originalFontNames);
-  });
+          const options: TestOptions = { elementId, params: {}, backend };
 
-  test('Basic', () => {
+          // Set font stack
+          const originalFontNames = Flow.getMusicFont();
+          Flow.setMusicFont(...FONT_STACKS[fontStackName]);
+
+          try {
+            const contextBuilder: ContextBuilder =
+              backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
+            testFunc(options, contextBuilder);
+          } finally {
+            // Restore original font
+            Flow.setMusicFont(...originalFontNames);
+            // Don't remove the element so we can see rendered output
+            // element.remove();
+          }
+        });
+      });
+    });
+  }
+
+  runTest('Basic', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = createTestElement();
-    const renderer = new Renderer(elementId, Renderer.Backends.CANVAS);
-    renderer.resize(1000, 240);
-    const ctx = renderer.getContext();
+    const ctx = contextBuilder(options.elementId, 1000, 240);
 
     const stave = new Stave(10, 10, 975);
     stave.setContext(ctx);
@@ -121,12 +137,9 @@ describe('Dot', () => {
     assert.ok(true, 'Full Dot');
   });
 
-  test('Multi Voice', () => {
+  runTest('Multi Voice', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = createTestElement();
-    const renderer = new Renderer(elementId, Renderer.Backends.CANVAS);
-    renderer.resize(750, 300);
-    const ctx = renderer.getContext();
+    const ctx = contextBuilder(options.elementId, 750, 300);
 
     const stave = new Stave(30, 45, 700).setContext(ctx).draw();
 

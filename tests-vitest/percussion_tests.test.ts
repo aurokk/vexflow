@@ -5,6 +5,7 @@
 // Percussion Tests - Vitest Version
 
 import {
+  ContextBuilder,
   Dot,
   Factory,
   Font,
@@ -20,18 +21,10 @@ import {
   Tremolo,
 } from '../src/index';
 
-import { afterAll, beforeAll, describe, test } from 'vitest';
+import { describe, test } from 'vitest';
 
 import { Flow } from '../src/flow';
-import { createAssert, FONT_STACKS, makeFactory } from './vitest_test_helpers';
-
-function createTestElement() {
-  const elementId = 'test_' + Date.now() + '_' + Math.random();
-  const element = document.createElement('canvas');
-  element.id = elementId;
-  document.body.appendChild(element);
-  return elementId;
-}
+import { createAssert, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
 
 /**
  * Helper function used by the drawNotes() test case below.
@@ -47,41 +40,68 @@ function showNote(struct: StaveNoteStruct, stave: Stave, ctx: RenderContext, x: 
  * Helper function for the seven test cases below.
  * Adds a percussion clef (two short vertical bars, like a pause sign) to the stave.
  */
-function createSingleMeasureTest(setup: (f: Factory) => void) {
-  return (): void => {
-    const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 500);
-    const stave = f.Stave().addClef('percussion').setTimeSignature('4/4');
-    setup(f);
-    f.Formatter().joinVoices(f.getVoices()).formatToStave(f.getVoices(), stave);
-    f.draw();
-    assert.ok(true);
-  };
+function createSingleMeasureTest(setup: (f: Factory) => void, options: TestOptions, contextBuilder: ContextBuilder): void {
+  const assert = createAssert();
+  const f = makeFactory(options.backend, options.elementId, 500);
+  const stave = f.Stave().addClef('percussion').setTimeSignature('4/4');
+  setup(f);
+  f.Formatter().joinVoices(f.getVoices()).formatToStave(f.getVoices(), stave);
+  f.draw();
+  assert.ok(true);
 }
 
 describe('Percussion', () => {
-  let originalFontNames: string[];
+  // Helper function to run a test with multiple backends and font stacks
+  function runTest(
+    testName: string,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    backends: Array<{ backend: number; fontStacks: string[] }> = [
+      { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
+      { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
+    ]
+  ) {
+    backends.forEach(({ backend, fontStacks }) => {
+      fontStacks.forEach((fontStackName) => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+          const elementId = generateTestID('percussion_test');
 
-  beforeAll(async () => {
-    originalFontNames = Flow.getMusicFont();
-    Flow.setMusicFont(...FONT_STACKS['Bravura']);
-  });
+          // Create the DOM element before the test runs
+          const tagName = backend === Renderer.Backends.SVG ? 'div' : 'canvas';
+          const element = document.createElement(tagName);
+          element.id = elementId;
+          document.body.appendChild(element);
 
-  afterAll(() => {
-    Flow.setMusicFont(...originalFontNames);
-  });
+          const assert = createAssert();
+          const options: TestOptions = { elementId, params: {}, backend };
 
-  test('Percussion Clef', () => {
+          // Set font stack
+          const originalFontNames = Flow.getMusicFont();
+          Flow.setMusicFont(...FONT_STACKS[fontStackName]);
+
+          try {
+            const contextBuilder: ContextBuilder =
+              backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
+            testFunc(options, contextBuilder);
+          } finally {
+            // Restore original font
+            Flow.setMusicFont(...originalFontNames);
+            // Don't remove the element so we can see rendered output
+            // element.remove();
+          }
+        });
+      });
+    });
+  }
+
+  runTest('Percussion Clef', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = createTestElement();
-    const ctx = Renderer.getCanvasContext(elementId, 400, 120);
+    const ctx = contextBuilder(options.elementId, 400, 120);
     new Stave(10, 10, 300).addClef('percussion').setContext(ctx).draw();
     assert.ok(true);
   });
 
-  test('Percussion Notes', () => {
+  runTest('Percussion Notes', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = createTestElement();
     const notes: StaveNoteStruct[] = [
       { keys: ['g/5/d0'], duration: '4' },
       { keys: ['g/5/d1'], duration: '4' },
@@ -101,7 +121,7 @@ describe('Percussion', () => {
       { keys: ['g/5/x3'], duration: '4' },
     ];
 
-    const ctx = Renderer.getCanvasContext(elementId, notes.length * 25 + 100, 240);
+    const ctx = contextBuilder(options.elementId, notes.length * 25 + 100, 240);
 
     // Draw two staves, one with up-stems and one with down-stems.
     for (let h = 0; h < 2; ++h) {
@@ -118,8 +138,7 @@ describe('Percussion', () => {
     }
   });
 
-  test(
-    'Percussion Basic0',
+  runTest('Percussion Basic0', (options: TestOptions, contextBuilder: ContextBuilder) => {
     createSingleMeasureTest((f) => {
       const voice0 = f
         .Voice()
@@ -148,11 +167,10 @@ describe('Percussion', () => {
       f.Beam({ notes: voice0.getTickables() as StemmableNote[] });
       f.Beam({ notes: voice1.getTickables().slice(0, 2) as StemmableNote[] });
       f.Beam({ notes: voice1.getTickables().slice(3, 5) as StemmableNote[] });
-    })
-  );
+    }, options, contextBuilder);
+  });
 
-  test(
-    'Percussion Basic1',
+  runTest('Percussion Basic1', (options: TestOptions, contextBuilder: ContextBuilder) => {
     createSingleMeasureTest((f) => {
       f.Voice().addTickables([
         f.StaveNote({ keys: ['f/5/x2'], duration: '4' }),
@@ -167,11 +185,10 @@ describe('Percussion', () => {
         f.StaveNote({ keys: ['f/4'], duration: '4', stem_direction: -1 }),
         f.StaveNote({ keys: ['d/4/x2', 'c/5'], duration: '4', stem_direction: -1 }),
       ]);
-    })
-  );
+    }, options, contextBuilder);
+  });
 
-  test(
-    'Percussion Basic2',
+  runTest('Percussion Basic2', (options: TestOptions, contextBuilder: ContextBuilder) => {
     createSingleMeasureTest((f) => {
       const voice0 = f
         .Voice()
@@ -201,11 +218,10 @@ describe('Percussion', () => {
 
       f.Beam({ notes: voice1.getTickables().slice(0, 2) as StemmableNote[] });
       f.Beam({ notes: voice1.getTickables().slice(4, 6) as StemmableNote[] });
-    })
-  );
+    }, options, contextBuilder);
+  });
 
-  test(
-    'Percussion Snare0',
+  runTest('Percussion Snare0', (options: TestOptions, contextBuilder: ContextBuilder) => {
     createSingleMeasureTest((f) => {
       const font = {
         family: Font.SERIF,
@@ -229,11 +245,10 @@ describe('Percussion', () => {
           .StaveNote({ keys: ['c/5'], duration: '4', stem_direction: -1 })
           .addModifier(f.Annotation({ text: 'L', font }), 0),
       ]);
-    })
-  );
+    }, options, contextBuilder);
+  });
 
-  test(
-    'Percussion Snare1',
+  runTest('Percussion Snare1', (options: TestOptions, contextBuilder: ContextBuilder) => {
     createSingleMeasureTest((f) => {
       f.Voice().addTickables([
         f
@@ -247,11 +262,10 @@ describe('Percussion', () => {
           .StaveNote({ keys: ['a/5/x3'], duration: '4', stem_direction: -1 })
           .addModifier(f.Articulation({ type: 'a,' }), 0),
       ]);
-    })
-  );
+    }, options, contextBuilder);
+  });
 
-  test(
-    'Percussion Snare2',
+  runTest('Percussion Snare2', (options: TestOptions, contextBuilder: ContextBuilder) => {
     createSingleMeasureTest((f) => {
       f.Voice().addTickables([
         f.StaveNote({ keys: ['c/5'], duration: '4', stem_direction: -1 }).addModifier(new Tremolo(1), 0),
@@ -259,11 +273,10 @@ describe('Percussion', () => {
         f.StaveNote({ keys: ['c/5'], duration: '4', stem_direction: -1 }).addModifier(new Tremolo(3), 0),
         f.StaveNote({ keys: ['c/5'], duration: '4', stem_direction: -1 }).addModifier(new Tremolo(4), 0),
       ]);
-    })
-  );
+    }, options, contextBuilder);
+  });
 
-  test(
-    'Percussion Snare3',
+  runTest('Percussion Snare3', (options: TestOptions, contextBuilder: ContextBuilder) => {
     createSingleMeasureTest((factory) => {
       factory
         .Voice()
@@ -273,6 +286,6 @@ describe('Percussion', () => {
           factory.GraceNote({ keys: ['c/5'], duration: '4', stem_direction: 1 }).addModifier(new Tremolo(3), 0),
           factory.StaveNote({ keys: ['c/5'], duration: '4', stem_direction: 1 }).addModifier(new Tremolo(4), 0),
         ]);
-    })
-  );
+    }, options, contextBuilder);
+  });
 });

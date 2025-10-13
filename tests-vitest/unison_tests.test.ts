@@ -3,37 +3,60 @@
 //
 // Unison Tests - Vitest Version
 
-import { afterAll, beforeAll, describe, test } from 'vitest';
+import { describe, test } from 'vitest';
 
 import { Flow } from '../src/flow';
+import { ContextBuilder, Renderer } from '../src/renderer';
 import { Tables } from '../src/tables';
-import { createAssert, FONT_STACKS, makeFactory } from './vitest_test_helpers';
-
-function createTestElement() {
-  const elementId = 'test_' + Date.now() + '_' + Math.random();
-  const element = document.createElement('canvas');
-  element.id = elementId;
-  document.body.appendChild(element);
-  return elementId;
-}
+import { createAssert, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
 
 describe('Unison', () => {
-  let originalFontNames: string[];
+  // Helper function to run a test with multiple backends and font stacks
+  function runTest(
+    testName: string,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    backends: Array<{ backend: number; fontStacks: string[] }> = [
+      { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
+      { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
+    ]
+  ) {
+    backends.forEach(({ backend, fontStacks }) => {
+      fontStacks.forEach((fontStackName) => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+          const elementId = generateTestID('unison_test');
 
-  beforeAll(async () => {
-    originalFontNames = Flow.getMusicFont();
-    Flow.setMusicFont(...FONT_STACKS['Bravura']);
-  });
+          // Create the DOM element before the test runs
+          const tagName = backend === Renderer.Backends.SVG ? 'div' : 'canvas';
+          const element = document.createElement(tagName);
+          element.id = elementId;
+          document.body.appendChild(element);
 
-  afterAll(() => {
-    Flow.setMusicFont(...originalFontNames);
-  });
+          const options: TestOptions = { elementId, params: {}, backend };
+
+          // Set font stack
+          const originalFontNames = Flow.getMusicFont();
+          Flow.setMusicFont(...FONT_STACKS[fontStackName]);
+
+          try {
+            const contextBuilder: ContextBuilder =
+              backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
+            testFunc(options, contextBuilder);
+          } finally {
+            // Restore original font
+            Flow.setMusicFont(...originalFontNames);
+            // Don't remove the element so we can see rendered output
+            // element.remove();
+          }
+        });
+      });
+    });
+  }
 
   function simple(unison: boolean, voice1: string, voice2: string) {
-    return () => {
+    return (options: TestOptions, contextBuilder: ContextBuilder) => {
       const assert = createAssert();
       Tables.UNISON = unison;
-      const vf = makeFactory(1, createTestElement(), 500, 200);
+      const vf = makeFactory(options.backend, options.elementId, 500, 200);
       const score = vf.EasyScore();
 
       const system = vf.System({ y: 40, x: 10, width: 400 });
@@ -49,10 +72,10 @@ describe('Unison', () => {
   }
 
   function style(unison: boolean) {
-    return () => {
+    return (options: TestOptions, contextBuilder: ContextBuilder) => {
       const assert = createAssert();
       Tables.UNISON = unison;
-      const vf = makeFactory(1, createTestElement(), 500, 200);
+      const vf = makeFactory(options.backend, options.elementId, 500, 200);
       const score = vf.EasyScore();
 
       const system = vf.System({ y: 40, x: 10, width: 400 });
@@ -72,10 +95,10 @@ describe('Unison', () => {
   }
 
   function breve(unison: boolean) {
-    return () => {
+    return (options: TestOptions, contextBuilder: ContextBuilder) => {
       const assert = createAssert();
       Tables.UNISON = unison;
-      const vf = makeFactory(1, createTestElement(), 500, 200);
+      const vf = makeFactory(options.backend, options.elementId, 500, 200);
       const score = vf.EasyScore();
 
       const system = vf.System({ y: 40, x: 10, width: 400 });
@@ -93,14 +116,14 @@ describe('Unison', () => {
     };
   }
 
-  test('Simple(true)', simple(true, 'e4/q, e4/q, e4/h', 'e4/8, e4/8, e4/q, e4/h'));
-  test('Simple(false)', simple(false, 'e4/q, e4/q, e4/h', 'e4/8, e4/8, e4/q, e4/h'));
-  test('Accidentals(true)', simple(true, 'e4/q, e#4/q, e#4/h', 'e4/8, e4/8, eb4/q, eb4/h'));
-  test('Accidentals(false)', simple(false, 'e4/q, e#4/q, e#4/h', 'e4/8, e4/8, eb4/q, eb4/h'));
-  test('Dots(true)', simple(true, 'e4/q.., e4/16, e4/h', '(a4 e4)/q., e4/8, e4/h'));
-  test('Dots(false)', simple(false, 'e4/q.., e4/16, e4/h', '(a4 e4)/q., e4/8, e4/h'));
-  test('Breve(true)', breve(true));
-  test('Breve(false)', breve(false));
-  test('Style(true)', style(true));
-  test('Style(false)', style(false));
+  runTest('Simple(true)', simple(true, 'e4/q, e4/q, e4/h', 'e4/8, e4/8, e4/q, e4/h'));
+  runTest('Simple(false)', simple(false, 'e4/q, e4/q, e4/h', 'e4/8, e4/8, e4/q, e4/h'));
+  runTest('Accidentals(true)', simple(true, 'e4/q, e#4/q, e#4/h', 'e4/8, e4/8, eb4/q, eb4/h'));
+  runTest('Accidentals(false)', simple(false, 'e4/q, e#4/q, e#4/h', 'e4/8, e4/8, eb4/q, eb4/h'));
+  runTest('Dots(true)', simple(true, 'e4/q.., e4/16, e4/h', '(a4 e4)/q., e4/8, e4/h'));
+  runTest('Dots(false)', simple(false, 'e4/q.., e4/16, e4/h', '(a4 e4)/q., e4/8, e4/h'));
+  runTest('Breve(true)', breve(true));
+  runTest('Breve(false)', breve(false));
+  runTest('Style(true)', style(true));
+  runTest('Style(false)', style(false));
 });

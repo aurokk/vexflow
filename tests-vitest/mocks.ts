@@ -11,9 +11,9 @@ import { TickContext } from '../src/tickcontext';
 import { Voice } from '../src/voice';
 
 class MockTickable extends Tickable {
-  tickContext?: TickContext;
+  declare tickContext?: TickContext;
   ticks: Fraction = new Fraction(1, 1);
-  voice?: Voice;
+  declare voice?: Voice;
   stave?: Stave;
   width: number = 0;
   ignore_ticks: boolean = false;

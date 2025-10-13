@@ -3,7 +3,7 @@
 //
 // Style Tests - Vitest Version
 
-import { afterAll, beforeAll, describe, test } from 'vitest';
+import { describe, test } from 'vitest';
 
 import { Annotation } from '../src/annotation';
 import { Articulation } from '../src/articulation';
@@ -14,22 +14,14 @@ import { Formatter } from '../src/formatter';
 import { KeySignature } from '../src/keysignature';
 import { NoteSubGroup } from '../src/notesubgroup';
 import { Ornament } from '../src/ornament';
-import { Renderer } from '../src/renderer';
+import { ContextBuilder, Renderer } from '../src/renderer';
 import { StaveModifierPosition } from '../src/stavemodifier';
 import { StaveNote } from '../src/stavenote';
 import { Stroke } from '../src/strokes';
 import { TabNote, TabNoteStruct } from '../src/tabnote';
 import { TabStave } from '../src/tabstave';
 import { TimeSignature } from '../src/timesignature';
-import { createAssert, FONT_STACKS, makeFactory } from './vitest_test_helpers';
-
-function createTestElement() {
-  const elementId = 'test_' + Date.now() + '_' + Math.random();
-  const element = document.createElement('canvas');
-  element.id = elementId;
-  document.body.appendChild(element);
-  return elementId;
-}
+import { createAssert, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
 
 /**
  * Helper function to create a ElementStyle options object of the form { fillStyle: XXX, strokeStyle: YYY }.
@@ -44,20 +36,50 @@ function FS(fillStyle: string, strokeStyle?: string): ElementStyle {
 }
 
 describe('Style', () => {
-  let originalFontNames: string[];
+  // Helper function to run a test with multiple backends and font stacks
+  function runTest(
+    testName: string,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    backends: Array<{ backend: number; fontStacks: string[] }> = [
+      { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
+      { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
+    ]
+  ) {
+    backends.forEach(({ backend, fontStacks }) => {
+      fontStacks.forEach((fontStackName) => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+          const elementId = generateTestID('style_test');
 
-  beforeAll(async () => {
-    originalFontNames = Flow.getMusicFont();
-    Flow.setMusicFont(...FONT_STACKS['Bravura']);
-  });
+          // Create the DOM element before the test runs
+          const tagName = backend === Renderer.Backends.SVG ? 'div' : 'canvas';
+          const element = document.createElement(tagName);
+          element.id = elementId;
+          document.body.appendChild(element);
 
-  afterAll(() => {
-    Flow.setMusicFont(...originalFontNames);
-  });
+          const options: TestOptions = { elementId, params: {}, backend };
 
-  test('Basic Style', () => {
+          // Set font stack
+          const originalFontNames = Flow.getMusicFont();
+          Flow.setMusicFont(...FONT_STACKS[fontStackName]);
+
+          try {
+            const contextBuilder: ContextBuilder =
+              backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
+            testFunc(options, contextBuilder);
+          } finally {
+            // Restore original font
+            Flow.setMusicFont(...originalFontNames);
+            // Don't remove the element so we can see rendered output
+            // element.remove();
+          }
+        });
+      });
+    });
+  }
+
+  runTest('Basic Style', (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 600, 150);
+    const f = makeFactory(options.backend, options.elementId, 600, 150);
     const stave = f.Stave({ x: 25, y: 20, width: 500 });
 
     // Stave modifiers test.
@@ -110,10 +132,9 @@ describe('Style', () => {
     assert.ok(true, 'Basic Style');
   });
 
-  test('TabNote modifiers Style', () => {
+  runTest('TabNote modifiers Style', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = createTestElement();
-    const ctx = Renderer.getCanvasContext(elementId, 500, 140);
+    const ctx = contextBuilder(options.elementId, 500, 140);
 
     ctx.font = '10pt Arial';
     const stave = new TabStave(10, 10, 450).addTabGlyph();

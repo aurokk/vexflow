@@ -3,38 +3,55 @@
 //
 // ChordNote Tests - Vitest Version
 
-import { afterAll, beforeAll, describe, test } from 'vitest';
+import { describe, test } from 'vitest';
 
 import { ChordNote } from '../src/chordnote';
 import { Flow } from '../src/flow';
-import { createAssert, FONT_STACKS, makeFactory } from './vitest_test_helpers';
-
-/**
- * Helper to create a unique element ID and DOM element for testing
- */
-function createTestElement() {
-  const elementId = 'test_' + Date.now() + '_' + Math.random();
-  const element = document.createElement('canvas');
-  element.id = elementId;
-  document.body.appendChild(element);
-  return elementId;
-}
+import { Renderer } from '../src/renderer';
+import { createAssert, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
 
 describe('ChordNote', () => {
-  let originalFontNames: string[];
+  // Helper function to run a test with multiple backends and font stacks
+  function runTest(
+    testName: string,
+    testFunc: (options: TestOptions) => void,
+    backends: Array<{ backend: number; fontStacks: string[] }> = [
+      { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
+      { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
+    ]
+  ) {
+    backends.forEach(({ backend, fontStacks }) => {
+      fontStacks.forEach((fontStackName) => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+          const elementId = generateTestID('chordnote_test');
 
-  beforeAll(async () => {
-    originalFontNames = Flow.getMusicFont();
-    Flow.setMusicFont(...FONT_STACKS['Bravura']);
-  });
+          // Create the DOM element before the test runs
+          const tagName = backend === Renderer.Backends.SVG ? 'div' : 'canvas';
+          const element = document.createElement(tagName);
+          element.id = elementId;
+          document.body.appendChild(element);
 
-  afterAll(() => {
-    Flow.setMusicFont(...originalFontNames);
-  });
+          const options: TestOptions = { elementId, params: {}, backend };
 
-  test('ChordNote - Basic Rendering', () => {
-    const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 600, 200);
+          // Set font stack
+          const originalFontNames = Flow.getMusicFont();
+          Flow.setMusicFont(...FONT_STACKS[fontStackName]);
+
+          try {
+            testFunc(options);
+          } finally {
+            // Restore original font
+            Flow.setMusicFont(...originalFontNames);
+            // Don't remove the element so we can see rendered output
+            // element.remove();
+          }
+        });
+      });
+    });
+  }
+
+  runTest('ChordNote - Basic Rendering', (options: TestOptions) => {
+    const f = makeFactory(options.backend, options.elementId, 600, 200);
     const stave = f.ChordStave({ x: 10, y: 40, width: 500 });
 
     // Create a chord note with chord symbols
@@ -48,12 +65,11 @@ describe('ChordNote', () => {
     f.Formatter().joinVoices([voice]).format([voice], 500);
     f.draw();
 
-    assert.ok(true, 'ChordNote renders successfully');
+    createAssert().ok(true, 'ChordNote renders successfully');
   });
 
-  test('ChordNote - Multiple Chords', () => {
-    const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 600, 200);
+  runTest('ChordNote - Multiple Chords', (options: TestOptions) => {
+    const f = makeFactory(options.backend, options.elementId, 600, 200);
     const stave = f.ChordStave({ x: 10, y: 40, width: 500 });
 
     const chordNote1 = new ChordNote({ duration: 'q' }, { line: 0 }).addText('C').addTextSuperscript('maj7');
@@ -74,12 +90,11 @@ describe('ChordNote', () => {
     f.Formatter().joinVoices([voice]).format([voice], 500);
     f.draw();
 
-    assert.ok(true, 'Multiple ChordNotes render successfully');
+    createAssert().ok(true, 'Multiple ChordNotes render successfully');
   });
 
-  test('ChordNote - Different Positions', () => {
-    const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 600, 300);
+  runTest('ChordNote - Different Positions', (options: TestOptions) => {
+    const f = makeFactory(options.backend, options.elementId, 600, 300);
     const stave = f.ChordStave({ x: 10, y: 40, width: 500 });
 
     const chordNote1 = new ChordNote({ duration: 'q' }, { line: 0 }).addText('C').addTextSuperscript('maj7');
@@ -100,12 +115,11 @@ describe('ChordNote', () => {
     f.Formatter().joinVoices([voice]).format([voice], 500);
     f.draw();
 
-    assert.ok(true, 'ChordNotes at different positions render successfully');
+    createAssert().ok(true, 'ChordNotes at different positions render successfully');
   });
 
-  test('ChordNote - Complex Chords', () => {
-    const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 800, 200);
+  runTest('ChordNote - Complex Chords', (options: TestOptions) => {
+    const f = makeFactory(options.backend, options.elementId, 800, 200);
     const stave = f.ChordStave({ x: 10, y: 40, width: 750 });
 
     // Test various complex chord notations
@@ -135,12 +149,11 @@ describe('ChordNote', () => {
     f.Formatter().joinVoices([voice]).format([voice], 500);
     f.draw();
 
-    assert.ok(true, 'Complex ChordNotes render successfully');
+    createAssert().ok(true, 'Complex ChordNotes render successfully');
   });
 
-  test('ChordNote - Over Bar Notation', () => {
-    const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 600, 200);
+  runTest('ChordNote - Over Bar Notation', (options: TestOptions) => {
+    const f = makeFactory(options.backend, options.elementId, 600, 200);
     const stave = f.ChordStave({ x: 10, y: 40, width: 500 });
 
     // Test over bar notation (C/G means C chord over G bass)
@@ -169,6 +182,6 @@ describe('ChordNote', () => {
     f.Formatter().joinVoices([voice]).format([voice], 500);
     f.draw();
 
-    assert.ok(true, 'Over bar notation ChordNotes render successfully');
+    createAssert().ok(true, 'Over bar notation ChordNotes render successfully');
   });
 });

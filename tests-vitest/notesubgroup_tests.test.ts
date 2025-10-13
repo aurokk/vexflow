@@ -4,23 +4,16 @@
 //
 // NoteSubGroup Tests - Vitest Version
 
-import { afterAll, beforeAll, describe, test } from 'vitest';
+import { describe, test } from 'vitest';
 
 import { BarNote } from '../src/barnote';
 import { Factory } from '../src/factory';
 import { Flow } from '../src/flow';
 import { Note } from '../src/note';
+import { ContextBuilder, Renderer } from '../src/renderer';
 import { BarlineType } from '../src/stavebarline';
 import { StaveNote, StaveNoteStruct } from '../src/stavenote';
-import { createAssert, FONT_STACKS, makeFactory } from './vitest_test_helpers';
-
-function createTestElement() {
-  const elementId = 'test_' + Date.now() + '_' + Math.random();
-  const element = document.createElement('canvas');
-  element.id = elementId;
-  document.body.appendChild(element);
-  return elementId;
-}
+import { createAssert, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
 
 function createShortcuts(f: Factory) {
   return {
@@ -31,20 +24,51 @@ function createShortcuts(f: Factory) {
 }
 
 describe('NoteSubGroup', () => {
-  let originalFontNames: string[];
+  // Helper function to run a test with multiple backends and font stacks
+  function runTest(
+    testName: string,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    backends: Array<{ backend: number; fontStacks: string[] }> = [
+      { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
+      { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
+    ]
+  ) {
+    backends.forEach(({ backend, fontStacks }) => {
+      fontStacks.forEach((fontStackName) => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+          const elementId = generateTestID('notesubgroup_test');
 
-  beforeAll(async () => {
-    originalFontNames = Flow.getMusicFont();
-    Flow.setMusicFont(...FONT_STACKS['Bravura']);
-  });
+          // Create the DOM element before the test runs
+          const tagName = backend === Renderer.Backends.SVG ? 'div' : 'canvas';
+          const element = document.createElement(tagName);
+          element.id = elementId;
+          document.body.appendChild(element);
 
-  afterAll(() => {
-    Flow.setMusicFont(...originalFontNames);
-  });
+          const assert = createAssert();
+          const options: TestOptions = { elementId, params: {}, backend };
 
-  test('Basic - ClefNote, TimeSigNote and BarNote', () => {
+          // Set font stack
+          const originalFontNames = Flow.getMusicFont();
+          Flow.setMusicFont(...FONT_STACKS[fontStackName]);
+
+          try {
+            const contextBuilder: ContextBuilder =
+              backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
+            testFunc(options, contextBuilder);
+          } finally {
+            // Restore original font
+            Flow.setMusicFont(...originalFontNames);
+            // Don't remove the element so we can see rendered output
+            // element.remove();
+          }
+        });
+      });
+    });
+  }
+
+  runTest('Basic - ClefNote, TimeSigNote and BarNote', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 750, 200);
+    const f = makeFactory(options.backend, options.elementId, 750, 200);
     const ctx = f.getContext();
     const stave = f.Stave({ width: 600 }).addClef('treble');
 
@@ -84,9 +108,9 @@ describe('NoteSubGroup', () => {
     assert.ok(true, 'all pass');
   });
 
-  test('Multi Voice', () => {
+  runTest('Multi Voice', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 550, 200);
+    const f = makeFactory(options.backend, options.elementId, 550, 200);
     const ctx = f.getContext();
     const stave = f.Stave().addClef('treble');
 
@@ -134,9 +158,9 @@ describe('NoteSubGroup', () => {
     assert.ok(true, 'all pass');
   });
 
-  test('Multi Voice Multiple Draws', () => {
+  runTest('Multi Voice Multiple Draws', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 550, 200);
+    const f = makeFactory(options.backend, options.elementId, 550, 200);
     const ctx = f.getContext();
     const stave = f.Stave().addClef('treble');
 
@@ -186,9 +210,9 @@ describe('NoteSubGroup', () => {
     assert.ok(true, 'all pass');
   });
 
-  test('Multi Staff', () => {
+  runTest('Multi Staff', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 550, 400);
+    const f = makeFactory(options.backend, options.elementId, 550, 400);
 
     const { createStaveNote, addAccidental, addSubGroup } = createShortcuts(f);
 

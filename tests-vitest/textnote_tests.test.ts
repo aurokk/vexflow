@@ -3,39 +3,62 @@
 //
 // Text Note Tests - Vitest Version
 
-import { afterAll, beforeAll, describe, test } from 'vitest';
+import { describe, test } from 'vitest';
 
 import { Crescendo } from '../src/crescendo';
 import { Flow } from '../src/flow';
 import { Font } from '../src/font';
 import { Note } from '../src/note';
+import { ContextBuilder, Renderer } from '../src/renderer';
 import { Stave } from '../src/stave';
 import { TextNote } from '../src/textnote';
-import { createAssert, FONT_STACKS, makeFactory } from './vitest_test_helpers';
-
-function createTestElement() {
-  const elementId = 'test_' + Date.now() + '_' + Math.random();
-  const element = document.createElement('canvas');
-  element.id = elementId;
-  document.body.appendChild(element);
-  return elementId;
-}
+import { createAssert, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
 
 describe('TextNote', () => {
-  let originalFontNames: string[];
+  // Helper function to run a test with multiple backends and font stacks
+  function runTest(
+    testName: string,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    backends: Array<{ backend: number; fontStacks: string[] }> = [
+      { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
+      { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
+    ]
+  ) {
+    backends.forEach(({ backend, fontStacks }) => {
+      fontStacks.forEach((fontStackName) => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+          const elementId = generateTestID('textnote_test');
 
-  beforeAll(async () => {
-    originalFontNames = Flow.getMusicFont();
-    Flow.setMusicFont(...FONT_STACKS['Bravura']);
-  });
+          // Create the DOM element before the test runs
+          const tagName = backend === Renderer.Backends.SVG ? 'div' : 'canvas';
+          const element = document.createElement(tagName);
+          element.id = elementId;
+          document.body.appendChild(element);
 
-  afterAll(() => {
-    Flow.setMusicFont(...originalFontNames);
-  });
+          const options: TestOptions = { elementId, params: {}, backend };
 
-  test('TextNote Formatting', () => {
+          // Set font stack
+          const originalFontNames = Flow.getMusicFont();
+          Flow.setMusicFont(...FONT_STACKS[fontStackName]);
+
+          try {
+            const contextBuilder: ContextBuilder =
+              backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
+            testFunc(options, contextBuilder);
+          } finally {
+            // Restore original font
+            Flow.setMusicFont(...originalFontNames);
+            // Don't remove the element so we can see rendered output
+            // element.remove();
+          }
+        });
+      });
+    });
+  }
+
+  runTest('TextNote Formatting', (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 400, 200);
+    const f = makeFactory(options.backend, options.elementId, 400, 200);
     const stave = f.Stave({ y: 40 });
     const score = f.EasyScore();
 
@@ -64,9 +87,9 @@ describe('TextNote', () => {
     assert.ok(true);
   });
 
-  test('TextNote Formatting 2', () => {
+  runTest('TextNote Formatting 2', (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 600, 200);
+    const f = makeFactory(options.backend, options.elementId, 600, 200);
     const stave = f.Stave({ y: 40 });
     const score = f.EasyScore();
 
@@ -119,9 +142,9 @@ describe('TextNote', () => {
     assert.ok(true);
   });
 
-  test('TextNote Superscript and Subscript', () => {
+  runTest('TextNote Superscript and Subscript', (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 600, 230);
+    const f = makeFactory(options.backend, options.elementId, 600, 230);
     const stave = f.Stave({ y: 40 });
     const score = f.EasyScore();
 
@@ -162,9 +185,9 @@ describe('TextNote', () => {
     assert.ok(true);
   });
 
-  test('TextNote Formatting With Glyphs 0', () => {
+  runTest('TextNote Formatting With Glyphs 0', (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 600, 230);
+    const f = makeFactory(options.backend, options.elementId, 600, 230);
     const stave = f.Stave({ y: 40 });
     const score = f.EasyScore();
 
@@ -201,9 +224,9 @@ describe('TextNote', () => {
     assert.ok(true);
   });
 
-  test('TextNote Formatting With Glyphs 1', () => {
+  runTest('TextNote Formatting With Glyphs 1', (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 600, 230);
+    const f = makeFactory(options.backend, options.elementId, 600, 230);
     const stave = f.Stave({ y: 40 });
     const score = f.EasyScore();
 
@@ -239,9 +262,9 @@ describe('TextNote', () => {
     assert.ok(true);
   });
 
-  test('Crescendo', () => {
+  runTest('Crescendo', (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 600, 230);
+    const f = makeFactory(options.backend, options.elementId, 600, 230);
     const stave = f.Stave({ y: 40 });
     const score = f.EasyScore();
 
@@ -260,9 +283,9 @@ describe('TextNote', () => {
     assert.ok(true);
   });
 
-  test('Text Dynamics', () => {
+  runTest('Text Dynamics', (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 600, 230);
+    const f = makeFactory(options.backend, options.elementId, 600, 230);
     const score = f.EasyScore();
 
     const voice = score.voice(

@@ -12,22 +12,12 @@ import { Element } from '../src/element';
 import { Flow } from '../src/flow';
 import { Font, FontStyle, FontWeight } from '../src/font';
 import { PedalMarking } from '../src/pedalmarking';
+import { Renderer } from '../src/renderer';
 import { StaveNote } from '../src/stavenote';
 import { TextBracket } from '../src/textbracket';
 import { TextNote } from '../src/textnote';
 import { Voice } from '../src/voice';
-import { createAssert, FONT_STACKS, makeFactory } from './vitest_test_helpers';
-
-/**
- * Helper to create a unique element ID and DOM element for testing
- */
-function createTestElement() {
-  const elementId = 'test_' + Date.now() + '_' + Math.random();
-  const element = document.createElement('canvas');
-  element.id = elementId;
-  document.body.appendChild(element);
-  return elementId;
-}
+import { createAssert, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
 
 describe('Font', () => {
   let originalFontNames: string[];
@@ -40,6 +30,45 @@ describe('Font', () => {
   afterAll(() => {
     Flow.setMusicFont(...originalFontNames);
   });
+
+  // Helper function to run a test with multiple backends and font stacks
+  function runTest(
+    testName: string,
+    testFunc: (options: TestOptions) => void,
+    backends: Array<{ backend: number; fontStacks: string[] }> = [
+      { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
+      { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
+    ]
+  ) {
+    backends.forEach(({ backend, fontStacks }) => {
+      fontStacks.forEach((fontStackName) => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+          const elementId = generateTestID('font_test');
+
+          // Create the DOM element before the test runs
+          const tagName = backend === Renderer.Backends.SVG ? 'div' : 'canvas';
+          const element = document.createElement(tagName);
+          element.id = elementId;
+          document.body.appendChild(element);
+
+          const options: TestOptions = { elementId, params: {}, backend };
+
+          // Set font stack
+          const originalFontNames = Flow.getMusicFont();
+          Flow.setMusicFont(...FONT_STACKS[fontStackName]);
+
+          try {
+            testFunc(options);
+          } finally {
+            // Restore original font
+            Flow.setMusicFont(...originalFontNames);
+            // Don't remove the element so we can see rendered output
+            // element.remove();
+          }
+        });
+      });
+    });
+  }
 
   test('setFont', () => {
     const assert = createAssert();
@@ -139,9 +168,9 @@ describe('Font', () => {
     }
   });
 
-  test('Set Text Font to Georgia', () => {
+  runTest('Set Text Font to Georgia', (options: TestOptions) => {
     const assert = createAssert();
-    const factory = makeFactory(1, createTestElement(), 400, 200);
+    const factory = makeFactory(options.backend, options.elementId, 400, 200);
     const stave = factory.Stave({ y: 40 });
     const score = factory.EasyScore();
 
@@ -177,11 +206,11 @@ describe('Font', () => {
     assert.ok(true);
   });
 
-  test('Set Music Font to Petaluma', () => {
+  runTest('Set Music Font to Petaluma', (options: TestOptions) => {
     const assert = createAssert();
     Flow.setMusicFont('Petaluma');
 
-    const factory = makeFactory(1, createTestElement(), 400, 200);
+    const factory = makeFactory(options.backend, options.elementId, 400, 200);
     const stave = factory.Stave({ y: 40 });
     const score = factory.EasyScore();
 

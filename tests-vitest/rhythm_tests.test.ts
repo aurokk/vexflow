@@ -3,7 +3,7 @@
 //
 // Rhythm Tests - Vitest Version
 
-import { afterAll, beforeAll, describe, test } from 'vitest';
+import { describe, test } from 'vitest';
 
 import { Annotation } from '../src/annotation';
 import { Beam } from '../src/beam';
@@ -13,32 +13,54 @@ import { Renderer } from '../src/renderer';
 import { Stave } from '../src/stave';
 import { BarlineType } from '../src/stavebarline';
 import { StaveNote } from '../src/stavenote';
-import { createAssert, FONT_STACKS } from './vitest_test_helpers';
-
-function createTestElement() {
-  const elementId = 'test_' + Date.now() + '_' + Math.random();
-  const element = document.createElement('canvas');
-  element.id = elementId;
-  document.body.appendChild(element);
-  return elementId;
-}
+import { ContextBuilder, createAssert, FONT_STACKS, generateTestID, TestOptions } from './vitest_test_helpers';
 
 describe('Rhythm', () => {
-  let originalFontNames: string[];
+  // Helper function to run a test with multiple backends and font stacks
+  function runTest(
+    testName: string,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    backends: Array<{ backend: number; fontStacks: string[] }> = [
+      { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
+      { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
+    ]
+  ) {
+    backends.forEach(({ backend, fontStacks }) => {
+      fontStacks.forEach((fontStackName) => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+          const elementId = generateTestID('rhythm_test');
 
-  beforeAll(async () => {
-    originalFontNames = Flow.getMusicFont();
-    Flow.setMusicFont(...FONT_STACKS['Bravura']);
-  });
+          // Create the DOM element before the test runs
+          const tagName = backend === Renderer.Backends.SVG ? 'div' : 'canvas';
+          const element = document.createElement(tagName);
+          element.id = elementId;
+          document.body.appendChild(element);
 
-  afterAll(() => {
-    Flow.setMusicFont(...originalFontNames);
-  });
+          const assert = createAssert();
+          const options: TestOptions = { elementId, params: {}, backend };
 
-  test('Rhythm Draw - slash notes', () => {
+          // Set font stack
+          const originalFontNames = Flow.getMusicFont();
+          Flow.setMusicFont(...FONT_STACKS[fontStackName]);
+
+          try {
+            const contextBuilder: ContextBuilder =
+              backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
+            testFunc(options, contextBuilder);
+          } finally {
+            // Restore original font
+            Flow.setMusicFont(...originalFontNames);
+            // Don't remove the element so we can see rendered output
+            // element.remove();
+          }
+        });
+      });
+    });
+  }
+
+  runTest('Rhythm Draw - slash notes', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = createTestElement();
-    const ctx = Renderer.getCanvasContext(elementId, 800, 150);
+    const ctx = contextBuilder(options.elementId, 800, 150);
 
     // bar 1
     const staveBar1 = new Stave(10, 30, 150);
@@ -153,10 +175,9 @@ describe('Rhythm', () => {
     assert.ok(true);
   });
 
-  test('Rhythm Draw - beamed slash notes', () => {
+  runTest('Rhythm Draw - beamed slash notes', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = createTestElement();
-    const ctx = Renderer.getCanvasContext(elementId, 800, 150);
+    const ctx = contextBuilder(options.elementId, 800, 150);
 
     // bar 1
     const staveBar1 = new Stave(10, 30, 300);
@@ -229,10 +250,9 @@ describe('Rhythm', () => {
     assert.ok(true);
   });
 
-  test('Rhythm Draw - beamed slash notes, some rests', () => {
+  runTest('Rhythm Draw - beamed slash notes, some rests', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = createTestElement();
-    const ctx = Renderer.getCanvasContext(elementId, 800, 150);
+    const ctx = contextBuilder(options.elementId, 800, 150);
 
     // bar 1
     const staveBar1 = new Stave(10, 30, 300);
@@ -316,10 +336,9 @@ describe('Rhythm', () => {
     assert.ok(true);
   });
 
-  test('Rhythm Draw - 16th note rhythm with scratches', () => {
+  runTest('Rhythm Draw - 16th note rhythm with scratches', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = createTestElement();
-    const ctx = Renderer.getCanvasContext(elementId, 800, 150);
+    const ctx = contextBuilder(options.elementId, 800, 150);
 
     // bar 1
     const staveBar1 = new Stave(10, 30, 300);
@@ -393,10 +412,9 @@ describe('Rhythm', () => {
     assert.ok(true);
   });
 
-  test('Rhythm Draw - 32nd note rhythm with scratches', () => {
+  runTest('Rhythm Draw - 32nd note rhythm with scratches', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = createTestElement();
-    const ctx = Renderer.getCanvasContext(elementId, 800, 150);
+    const ctx = contextBuilder(options.elementId, 800, 150);
 
     // bar 1
     const staveBar1 = new Stave(10, 30, 300);

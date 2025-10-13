@@ -5,6 +5,9 @@ import { ContextBuilder, Factory, Flow, Font, RenderContext, Renderer } from '..
 
 import { expect } from 'vitest';
 
+// Re-export ContextBuilder for use in test files
+export type { ContextBuilder };
+
 export interface TestOptions {
   elementId: string;
   params: any;

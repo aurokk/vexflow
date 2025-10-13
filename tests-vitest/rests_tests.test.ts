@@ -3,7 +3,7 @@
 //
 // Rests Tests - Vitest Version
 
-import { afterAll, beforeAll, describe, test } from 'vitest';
+import { describe, test } from 'vitest';
 
 import { Beam } from '../src/beam';
 import { Dot } from '../src/dot';
@@ -15,25 +15,18 @@ import { Stave } from '../src/stave';
 import { StaveNote, StaveNoteStruct } from '../src/stavenote';
 import { Tuplet } from '../src/tuplet';
 import { Voice } from '../src/voice';
-import { createAssert, FONT_STACKS } from './vitest_test_helpers';
-
-function createTestElement() {
-  const elementId = 'test_' + Date.now() + '_' + Math.random();
-  const element = document.createElement('canvas');
-  element.id = elementId;
-  document.body.appendChild(element);
-  return elementId;
-}
+import { ContextBuilder, createAssert, FONT_STACKS, generateTestID, TestOptions } from './vitest_test_helpers';
 
 /**
  * Helper function to create a context and stave.
  */
 function setupContext(
+  contextBuilder: ContextBuilder,
   elementId: string,
   width: number = 350,
   height: number = 150
 ): { context: RenderContext; stave: Stave } {
-  const context = Renderer.getCanvasContext(elementId, width, height);
+  const context = contextBuilder(elementId, width, height);
   context.scale(0.9, 0.9);
   context.font = '10pt Arial';
 
@@ -46,24 +39,54 @@ function setupContext(
 const note = (noteStruct: StaveNoteStruct) => new StaveNote(noteStruct);
 
 describe('Rests', () => {
-  let originalFontNames: string[];
+  // Helper function to run a test with multiple backends and font stacks
+  function runTest(
+    testName: string,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    backends: Array<{ backend: number; fontStacks: string[] }> = [
+      { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
+      { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
+    ]
+  ) {
+    backends.forEach(({ backend, fontStacks }) => {
+      fontStacks.forEach((fontStackName) => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+          const elementId = generateTestID('rests_test');
 
-  beforeAll(async () => {
-    originalFontNames = Flow.getMusicFont();
-    Flow.setMusicFont(...FONT_STACKS['Bravura']);
-  });
+          // Create the DOM element before the test runs
+          const tagName = backend === Renderer.Backends.SVG ? 'div' : 'canvas';
+          const element = document.createElement(tagName);
+          element.id = elementId;
+          document.body.appendChild(element);
 
-  afterAll(() => {
-    Flow.setMusicFont(...originalFontNames);
-  });
+          const assert = createAssert();
+          const options: TestOptions = { elementId, params: {}, backend };
+
+          // Set font stack
+          const originalFontNames = Flow.getMusicFont();
+          Flow.setMusicFont(...FONT_STACKS[fontStackName]);
+
+          try {
+            const contextBuilder: ContextBuilder =
+              backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
+            testFunc(options, contextBuilder);
+          } finally {
+            // Restore original font
+            Flow.setMusicFont(...originalFontNames);
+            // Don't remove the element so we can see rendered output
+            // element.remove();
+          }
+        });
+      });
+    });
+  }
 
   /**
    * Use the ledger glyph if the whole or half rest is above/below the staff
    */
-  test('Outside Stave', () => {
+  runTest('Outside Stave', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = createTestElement();
-    const { context, stave } = setupContext(elementId, 700);
+    const { context, stave } = setupContext(contextBuilder, options.elementId, 700);
 
     const notes = [
       new StaveNote({ keys: ['a/5'], stem_direction: 1, duration: 'wr' }),
@@ -82,10 +105,9 @@ describe('Rests', () => {
    * Dotted rests (whole to 128th).
    * The rest duration is specified as 'wr', 'hr', ..., '128r'.
    */
-  test('Dotted', () => {
+  runTest('Dotted', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = createTestElement();
-    const { context, stave } = setupContext(elementId, 700);
+    const { context, stave } = setupContext(contextBuilder, options.elementId, 700);
 
     const notes = [
       new StaveNote({ keys: ['b/4'], stem_direction: 1, duration: '1/2r' }),
@@ -109,10 +131,9 @@ describe('Rests', () => {
   /**
    * Rests are intermixed within beamed notes (with the stems and beams at the top).
    */
-  test('Auto Align - Beamed Notes Stems Up', () => {
+  runTest('Auto Align - Beamed Notes Stems Up', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = createTestElement();
-    const { context, stave } = setupContext(elementId, 600, 160);
+    const { context, stave } = setupContext(contextBuilder, options.elementId, 600, 160);
 
     const notes = [
       note({ keys: ['e/5'], stem_direction: 1, duration: '8' }),
@@ -147,10 +168,9 @@ describe('Rests', () => {
   /**
    * Rests are intermixed within beamed notes (with the stems and beams at the bottom).
    */
-  test('Auto Align - Beamed Notes Stems Down', () => {
+  runTest('Auto Align - Beamed Notes Stems Down', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = createTestElement();
-    const { context, stave } = setupContext(elementId, 600, 160);
+    const { context, stave } = setupContext(contextBuilder, options.elementId, 600, 160);
 
     const notes = [
       note({ keys: ['a/5'], stem_direction: -1, duration: '8' }),
@@ -186,10 +206,9 @@ describe('Rests', () => {
    * Call setTupletLocation(Tuplet.LOCATION_TOP) to place the tuplet indicator (bracket and number) at the
    * top of the group of notes. Tuplet.LOCATION_TOP is the default, so this is optional.
    */
-  test('Auto Align - Tuplets Stems Up', () => {
+  runTest('Auto Align - Tuplets Stems Up', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = createTestElement();
-    const { context, stave } = setupContext(elementId, 600, 160);
+    const { context, stave } = setupContext(contextBuilder, options.elementId, 600, 160);
 
     const notes = [
       note({ keys: ['b/4'], stem_direction: 1, duration: '4' }),
@@ -228,10 +247,9 @@ describe('Rests', () => {
    * Call setTupletLocation(Tuplet.LOCATION_BOTTOM) to place the tuplet indicator (bracket and number) at the
    * bottom of the group of notes.
    */
-  test('Auto Align - Tuplets Stems Down', () => {
+  runTest('Auto Align - Tuplets Stems Down', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = createTestElement();
-    const { context, stave } = setupContext(elementId, 600, 160);
+    const { context, stave } = setupContext(contextBuilder, options.elementId, 600, 160);
 
     const notes = [
       note({ keys: ['a/5'], stem_direction: -1, duration: '8r' }),
@@ -281,10 +299,9 @@ describe('Rests', () => {
    * when they are inside a group of beamed notes (in which case they are
    * centered vertically within that group).
    */
-  test('Auto Align - Single Voice (Default)', () => {
+  runTest('Auto Align - Single Voice (Default)', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = createTestElement();
-    const { context, stave } = setupContext(elementId, 600, 160);
+    const { context, stave } = setupContext(contextBuilder, options.elementId, 600, 160);
 
     const notes = [
       note({ keys: ['b/4'], stem_direction: -1, duration: '4r' }),
@@ -323,10 +340,9 @@ describe('Rests', () => {
    * The only difference between staveRestsAll() and staveRests() is that this test case
    * passes { align_rests: true } to Formatter.FormatAndDraw(...).
    */
-  test('Auto Align - Single Voice (Align All)', () => {
+  runTest('Auto Align - Single Voice (Align All)', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = createTestElement();
-    const { context, stave } = setupContext(elementId, 600, 160);
+    const { context, stave } = setupContext(contextBuilder, options.elementId, 600, 160);
 
     const notes = [
       note({ keys: ['b/4'], stem_direction: -1, duration: '4r' }),
@@ -367,10 +383,9 @@ describe('Rests', () => {
    * The top voice shows quarter-note chords alternating with quarter rests.
    * The bottom voice shows two groups of beamed eighth notes, with eighth rests.
    */
-  test('Auto Align - Multi Voice', () => {
+  runTest('Auto Align - Multi Voice', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = createTestElement();
-    const ctx = Renderer.getCanvasContext(elementId, 600, 200);
+    const ctx = contextBuilder(options.elementId, 600, 200);
     const stave = new Stave(50, 10, 500).addClef('treble').setContext(ctx).addTimeSignature('4/4').draw();
 
     const noteOnStave = (noteStruct: StaveNoteStruct) => new StaveNote(noteStruct).setStave(stave);

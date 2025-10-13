@@ -8,26 +8,19 @@
 //       The SVGContext operates differently. It just sets the sx and sy as the new scale, instead of multiplying it.
 //       See: https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/scale
 
-import { afterAll, beforeAll, describe, test } from 'vitest';
+import { describe, test } from 'vitest';
 
 import { Flow } from '../src/flow';
 import { Formatter } from '../src/formatter';
 import { NoteHead } from '../src/notehead';
 import { RenderContext } from '../src/rendercontext';
-import { Renderer } from '../src/renderer';
+import { ContextBuilder, Renderer } from '../src/renderer';
 import { Stave } from '../src/stave';
 import { StaveNote, StaveNoteStruct } from '../src/stavenote';
 import { TickContext } from '../src/tickcontext';
 import { Voice } from '../src/voice';
-import { createAssert, FONT_STACKS } from './vitest_test_helpers';
+import { createAssert, FONT_STACKS, generateTestID, TestOptions } from './vitest_test_helpers';
 
-function createTestElement() {
-  const elementId = 'test_' + Date.now() + '_' + Math.random();
-  const element = document.createElement('canvas');
-  element.id = elementId;
-  document.body.appendChild(element);
-  return elementId;
-}
 
 function setContextStyle(ctx: RenderContext): void {
   // The final scale should be 1.8.
@@ -49,21 +42,51 @@ function showNote(noteStruct: StaveNoteStruct, stave: Stave, ctx: RenderContext,
 }
 
 describe('NoteHead', () => {
-  let originalFontNames: string[];
+  // Helper function to run a test with multiple backends and font stacks
+  function runTest(
+    testName: string,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    backends: Array<{ backend: number; fontStacks: string[] }> = [
+      { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
+      { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
+    ]
+  ) {
+    backends.forEach(({ backend, fontStacks }) => {
+      fontStacks.forEach((fontStackName) => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+          const elementId = generateTestID('notehead_test');
 
-  beforeAll(async () => {
-    originalFontNames = Flow.getMusicFont();
-    Flow.setMusicFont(...FONT_STACKS['Bravura']);
-  });
+          // Create the DOM element before the test runs
+          const tagName = backend === Renderer.Backends.SVG ? 'div' : 'canvas';
+          const element = document.createElement(tagName);
+          element.id = elementId;
+          document.body.appendChild(element);
 
-  afterAll(() => {
-    Flow.setMusicFont(...originalFontNames);
-  });
+          const assert = createAssert();
+          const options: TestOptions = { elementId, params: {}, backend };
 
-  test('Basic', () => {
+          // Set font stack
+          const originalFontNames = Flow.getMusicFont();
+          Flow.setMusicFont(...FONT_STACKS[fontStackName]);
+
+          try {
+            const contextBuilder: ContextBuilder =
+              backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
+            testFunc(options, contextBuilder);
+          } finally {
+            // Restore original font
+            Flow.setMusicFont(...originalFontNames);
+            // Don't remove the element so we can see rendered output
+            // element.remove();
+          }
+        });
+      });
+    });
+  }
+
+  runTest('Basic', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = createTestElement();
-    const ctx = Renderer.getCanvasContext(elementId, 450, 250);
+    const ctx = contextBuilder(options.elementId, 450, 250);
     setContextStyle(ctx);
 
     const stave = new Stave(10, 0, 250).addClef('treble');
@@ -84,9 +107,8 @@ describe('NoteHead', () => {
     assert.ok('Basic NoteHead test');
   });
 
-  test('Various Heads', () => {
+  runTest('Various Heads', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = createTestElement();
     const notes: StaveNoteStruct[] = [
       { keys: ['g/5/d0'], duration: '4' },
       { keys: ['g/5/d1'], duration: '4' },
@@ -114,7 +136,7 @@ describe('NoteHead', () => {
       { keys: ['g/5/r2'], duration: '4' },
     ];
 
-    const ctx = Renderer.getCanvasContext(elementId, notes.length * 25 + 100, 240);
+    const ctx = contextBuilder(options.elementId, notes.length * 25 + 100, 240);
 
     // Draw two staves, one with up-stems and one with down-stems.
     for (let staveNum = 0; staveNum < 2; ++staveNum) {
@@ -134,9 +156,8 @@ describe('NoteHead', () => {
     }
   });
 
-  test('Various Note Heads 1', () => {
+  runTest('Various Note Heads 1', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = createTestElement();
     const notes: StaveNoteStruct[] = [
       { keys: ['g/5/d'], duration: '1/2' },
       { keys: ['g/5/d'], duration: '1' },
@@ -185,7 +206,7 @@ describe('NoteHead', () => {
       { keys: ['x/'], duration: '1' },
     ];
 
-    const ctx = Renderer.getCanvasContext(elementId, notes.length * 25 + 100, 240);
+    const ctx = contextBuilder(options.elementId, notes.length * 25 + 100, 240);
 
     // Draw two staves, one with up-stems and one with down-stems.
     for (let staveNum = 0; staveNum < 2; ++staveNum) {
@@ -205,9 +226,8 @@ describe('NoteHead', () => {
     }
   });
 
-  test('Various Note Heads 2', () => {
+  runTest('Various Note Heads 2', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = createTestElement();
     const notes: StaveNoteStruct[] = [
       { keys: ['g/5/do'], duration: '4', auto_stem: true },
       { keys: ['g/5/re'], duration: '4', auto_stem: true },
@@ -219,7 +239,7 @@ describe('NoteHead', () => {
       { keys: ['g/5/ti'], duration: '4', auto_stem: true },
     ];
 
-    const ctx = Renderer.getCanvasContext(elementId, notes.length * 25 + 100, 240);
+    const ctx = contextBuilder(options.elementId, notes.length * 25 + 100, 240);
 
     const stave = new Stave(10, 10, notes.length * 25 + 75).addClef('percussion').setContext(ctx).draw();
 
@@ -232,9 +252,8 @@ describe('NoteHead', () => {
     }
   });
 
-  test('Drum Chord Heads', () => {
+  runTest('Drum Chord Heads', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = createTestElement();
     const notes: StaveNoteStruct[] = [
       { keys: ['a/4/d0', 'g/5/x3'], duration: '4' },
       { keys: ['a/4/x3', 'g/5/d0'], duration: '4' },
@@ -258,7 +277,7 @@ describe('NoteHead', () => {
       { keys: ['a/4/r2', 'g/5/t3'], duration: '4' },
     ];
 
-    const ctx = Renderer.getCanvasContext(elementId, notes.length * 25 + 100, 240);
+    const ctx = contextBuilder(options.elementId, notes.length * 25 + 100, 240);
 
     // Draw two staves, one with up-stems and one with down-stems.
     for (let h = 0; h < 2; ++h) {
@@ -275,10 +294,9 @@ describe('NoteHead', () => {
     }
   });
 
-  test('Bounding Boxes', () => {
+  runTest('Bounding Boxes', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = createTestElement();
-    const ctx = Renderer.getCanvasContext(elementId, 450, 250);
+    const ctx = contextBuilder(options.elementId, 450, 250);
     setContextStyle(ctx);
 
     // 250 is 450/1.8

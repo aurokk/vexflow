@@ -283,7 +283,7 @@ describe('Stave', () => {
     { fontSize: 14 }
   );
 
-  runTest('Multiple Staves Repeats Test', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Multiple Stave Repeats Test', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     assert.ok(true);
 

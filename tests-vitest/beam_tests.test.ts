@@ -18,40 +18,51 @@ import {
   Voice,
 } from '../src/index';
 
-import { afterAll, beforeAll, describe, test } from 'vitest';
+import { describe, test } from 'vitest';
 
 import { Flow } from '../src/flow';
-import { createAssert, FONT_STACKS } from './vitest_test_helpers';
+import { Renderer, ContextBuilder } from '../src/renderer';
+import { createAssert, FONT_STACKS, generateTestID, TestOptions } from './vitest_test_helpers';
 
 // Helper to flatten arrays
 const concat = <T>(a: T[], b: T[]): T[] => a.concat(b);
 
-/**
- * Helper to create a unique element ID and DOM element for testing
- */
-function createTestElement() {
-  const elementId = 'test_' + Date.now() + '_' + Math.random();
-  const element = document.createElement('canvas');
-  element.id = elementId;
-  document.body.appendChild(element);
-  return elementId;
-}
-
 describe('Beam', () => {
-  let originalFontNames: string[];
+  function runTest(
+    testName: string,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    backends: Array<{ backend: number; fontStacks: string[] }> = [
+      { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
+      { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
+    ]
+  ) {
+    backends.forEach(({ backend, fontStacks }) => {
+      fontStacks.forEach((fontStackName) => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+          const elementId = generateTestID('test');
+          const tagName = backend === Renderer.Backends.SVG ? 'div' : 'canvas';
+          const element = document.createElement(tagName);
+          element.id = elementId;
+          document.body.appendChild(element);
 
-  beforeAll(async () => {
-    originalFontNames = Flow.getMusicFont();
-    Flow.setMusicFont(...FONT_STACKS['Bravura']);
-  });
+          const options: TestOptions = { elementId, params: {}, backend };
+          const originalFontNames = Flow.getMusicFont();
+          Flow.setMusicFont(...FONT_STACKS[fontStackName]);
 
-  afterAll(() => {
-    Flow.setMusicFont(...originalFontNames);
-  });
-
-  test('Simple Beam', () => {
+          try {
+            const contextBuilder: ContextBuilder =
+              backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
+            testFunc(options, contextBuilder);
+          } finally {
+            Flow.setMusicFont(...originalFontNames);
+          }
+        });
+      });
+    });
+  }
+  runTest('Simple Beam', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = new Factory({ renderer: { elementId: createTestElement(), backend: 1, width: 450, height: 140 } });
+    const f = new Factory({ renderer: { elementId: options.elementId, backend: options.backend, width: 450, height: 140 } });
     const stave = f.Stave();
     const score = f.EasyScore();
 
@@ -73,9 +84,9 @@ describe('Beam', () => {
     assert.ok(true, 'Simple Test');
   });
 
-  test('Multi Beam', () => {
+  runTest('Multi Beam', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = new Factory({ renderer: { elementId: createTestElement(), backend: 1, width: 450, height: 140 } });
+    const f = new Factory({ renderer: { elementId: options.elementId, backend: options.backend, width: 450, height: 140 } });
     const stave = f.Stave();
     const score = f.EasyScore();
 
@@ -101,9 +112,9 @@ describe('Beam', () => {
     assert.ok(true, 'Multi Test');
   });
 
-  test('Sixteenth Beam', () => {
+  runTest('Sixteenth Beam', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = new Factory({ renderer: { elementId: createTestElement(), backend: 1, width: 450, height: 140 } });
+    const f = new Factory({ renderer: { elementId: options.elementId, backend: options.backend, width: 450, height: 140 } });
     const stave = f.Stave();
     const score = f.EasyScore();
 
@@ -135,9 +146,9 @@ describe('Beam', () => {
     assert.ok(true, 'Sixteenth Test');
   });
 
-  test('Slopey Beam', () => {
+  runTest('Slopey Beam', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = new Factory({ renderer: { elementId: createTestElement(), backend: 1, width: 350, height: 140 } });
+    const f = new Factory({ renderer: { elementId: options.elementId, backend: options.backend, width: 350, height: 140 } });
     const stave = f.Stave({ y: 20 });
     const score = f.EasyScore();
 
@@ -157,9 +168,9 @@ describe('Beam', () => {
     assert.ok(true, 'Slopey Test');
   });
 
-  test('Auto-stemmed Beam', () => {
+  runTest('Auto-stemmed Beam', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = new Factory({ renderer: { elementId: createTestElement(), backend: 1, width: 350, height: 140 } });
+    const f = new Factory({ renderer: { elementId: options.elementId, backend: options.backend, width: 350, height: 140 } });
     const stave = f.Stave({ y: 20 });
     const score = f.EasyScore();
 
@@ -195,9 +206,9 @@ describe('Beam', () => {
     assert.ok(true, 'AutoStem Beam Test');
   });
 
-  test('Mixed Beam 1', () => {
+  runTest('Mixed Beam 1', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = new Factory({ renderer: { elementId: createTestElement(), backend: 1, width: 350, height: 140 } });
+    const f = new Factory({ renderer: { elementId: options.elementId, backend: options.backend, width: 350, height: 140 } });
     const stave = f.Stave({ y: 20 });
     const score = f.EasyScore();
 
@@ -228,9 +239,9 @@ describe('Beam', () => {
     assert.ok(true, 'Multi Test');
   });
 
-  test('Mixed Beam 2', () => {
+  runTest('Mixed Beam 2', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = new Factory({ renderer: { elementId: createTestElement(), backend: 1, width: 450, height: 180 } });
+    const f = new Factory({ renderer: { elementId: options.elementId, backend: options.backend, width: 450, height: 180 } });
     const stave = f.Stave({ y: 20 });
     const score = f.EasyScore();
 
@@ -258,9 +269,9 @@ describe('Beam', () => {
     assert.ok(true, 'Multi Test');
   });
 
-  test('Dotted Beam', () => {
+  runTest('Dotted Beam', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = new Factory({ renderer: { elementId: createTestElement(), backend: 1, width: 450, height: 140 } });
+    const f = new Factory({ renderer: { elementId: options.elementId, backend: options.backend, width: 450, height: 140 } });
     const stave = f.Stave();
     const score = f.EasyScore();
 
@@ -281,9 +292,9 @@ describe('Beam', () => {
     assert.ok(true, 'Dotted Test');
   });
 
-  test('Partial Beam', () => {
+  runTest('Partial Beam', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = new Factory({ renderer: { elementId: createTestElement(), backend: 1, width: 450, height: 140 } });
+    const f = new Factory({ renderer: { elementId: options.elementId, backend: options.backend, width: 450, height: 140 } });
     const stave = f.Stave();
     const score = f.EasyScore();
 
@@ -307,9 +318,9 @@ describe('Beam', () => {
     assert.ok(true, 'Partial Test');
   });
 
-  test('Close Trade-offs Beam', () => {
+  runTest('Close Trade-offs Beam', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = new Factory({ renderer: { elementId: createTestElement(), backend: 1, width: 450, height: 140 } });
+    const f = new Factory({ renderer: { elementId: options.elementId, backend: options.backend, width: 450, height: 140 } });
     const stave = f.Stave();
     const score = f.EasyScore();
 
@@ -326,9 +337,9 @@ describe('Beam', () => {
     assert.ok(true, 'Close Trade-offs Test');
   });
 
-  test('Insane Beam', () => {
+  runTest('Insane Beam', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = new Factory({ renderer: { elementId: createTestElement(), backend: 1, width: 450, height: 180 } });
+    const f = new Factory({ renderer: { elementId: options.elementId, backend: options.backend, width: 450, height: 180 } });
     const stave = f.Stave({ y: 20 });
     const score = f.EasyScore();
 
@@ -347,9 +358,9 @@ describe('Beam', () => {
     assert.ok(true, 'Insane Test');
   });
 
-  test('Lengthy Beam', () => {
+  runTest('Lengthy Beam', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = new Factory({ renderer: { elementId: createTestElement(), backend: 1, width: 450, height: 180 } });
+    const f = new Factory({ renderer: { elementId: options.elementId, backend: options.backend, width: 450, height: 180 } });
     const stave = f.Stave({ y: 20 });
     const score = f.EasyScore();
 
@@ -362,9 +373,9 @@ describe('Beam', () => {
     assert.ok(true, 'Lengthy Test');
   });
 
-  test('Outlier Beam', () => {
+  runTest('Outlier Beam', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = new Factory({ renderer: { elementId: createTestElement(), backend: 1, width: 450, height: 180 } });
+    const f = new Factory({ renderer: { elementId: options.elementId, backend: options.backend, width: 450, height: 180 } });
     const stave = f.Stave({ y: 20 });
     const score = f.EasyScore();
 
@@ -388,9 +399,9 @@ describe('Beam', () => {
     assert.ok(true, 'Outlier Test');
   });
 
-  test('Break Secondary Beams', () => {
+  runTest('Break Secondary Beams', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = new Factory({ renderer: { elementId: createTestElement(), backend: 1, width: 600, height: 200 } });
+    const f = new Factory({ renderer: { elementId: options.elementId, backend: options.backend, width: 600, height: 200 } });
     const stave = f.Stave({ y: 20 });
     const score = f.EasyScore();
 
@@ -424,9 +435,9 @@ describe('Beam', () => {
     assert.ok(true, 'Breaking Secondary Beams Test');
   });
 
-  test('Partial Beam Direction', () => {
+  runTest('Partial Beam Direction', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = new Factory({ renderer: { elementId: createTestElement(), backend: 1, width: 600, height: 200 } });
+    const f = new Factory({ renderer: { elementId: options.elementId, backend: options.backend, width: 600, height: 200 } });
     const stave = f.Stave({ y: 20 });
     const score = f.EasyScore();
 
@@ -455,9 +466,9 @@ describe('Beam', () => {
     assert.ok(true, 'Partial beam direction test');
   });
 
-  test('TabNote Beams Up', () => {
+  runTest('TabNote Beams Up', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = new Factory({ renderer: { elementId: createTestElement(), backend: 1, width: 600, height: 200 } });
+    const f = new Factory({ renderer: { elementId: options.elementId, backend: options.backend, width: 600, height: 200 } });
     const stave = f.TabStave({ y: 20 });
 
     const specs: TabNoteStruct[] = [
@@ -535,9 +546,9 @@ describe('Beam', () => {
     assert.ok(true, 'All objects have been drawn');
   });
 
-  test('TabNote Beams Down', () => {
+  runTest('TabNote Beams Down', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = new Factory({ renderer: { elementId: createTestElement(), backend: 1, width: 600, height: 250 } });
+    const f = new Factory({ renderer: { elementId: options.elementId, backend: options.backend, width: 600, height: 250 } });
     const stave = f.TabStave({ options: { num_lines: 10 } });
 
     const specs: TabNoteStruct[] = [
@@ -630,9 +641,9 @@ describe('Beam', () => {
     assert.ok(true, 'All objects have been drawn');
   });
 
-  test('TabNote Auto Create Beams', () => {
+  runTest('TabNote Auto Create Beams', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = new Factory({ renderer: { elementId: createTestElement(), backend: 1, width: 600, height: 200 } });
+    const f = new Factory({ renderer: { elementId: options.elementId, backend: options.backend, width: 600, height: 200 } });
     const stave = f.TabStave();
 
     const specs: TabNoteStruct[] = [
@@ -693,9 +704,9 @@ describe('Beam', () => {
     assert.ok(true, 'All objects have been drawn');
   });
 
-  test('TabNote Beams Auto Stem', () => {
+  runTest('TabNote Beams Auto Stem', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = new Factory({ renderer: { elementId: createTestElement(), backend: 1, width: 600, height: 300 } });
+    const f = new Factory({ renderer: { elementId: options.elementId, backend: options.backend, width: 600, height: 300 } });
     const stave = f.TabStave();
 
     const specs: TabNoteStruct[] = [
@@ -762,9 +773,9 @@ describe('Beam', () => {
     assert.ok(true, 'All objects have been drawn');
   });
 
-  test('Complex Beams with Annotations', () => {
+  runTest('Complex Beams with Annotations', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const factory = new Factory({ renderer: { elementId: createTestElement(), backend: 1, width: 500, height: 200 } });
+    const factory = new Factory({ renderer: { elementId: options.elementId, backend: options.backend, width: 500, height: 200 } });
     const stave = factory.Stave({ y: 40 });
 
     const s1: StaveNoteStruct[] = [
@@ -818,9 +829,9 @@ describe('Beam', () => {
     assert.ok(true, 'Complex beam annotations');
   });
 
-  test('Complex Beams with Articulations', () => {
+  runTest('Complex Beams with Articulations', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = new Factory({ renderer: { elementId: createTestElement(), backend: 1, width: 500, height: 200 } });
+    const f = new Factory({ renderer: { elementId: options.elementId, backend: options.backend, width: 500, height: 200 } });
     const stave = f.Stave({ y: 40 });
 
     const s1: StaveNoteStruct[] = [
@@ -862,9 +873,9 @@ describe('Beam', () => {
     assert.ok(true, 'Complex beam articulations');
   });
 
-  test('Complex Beams with Articulations two Staves', () => {
+  runTest('Complex Beams with Articulations two Staves', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = new Factory({ renderer: { elementId: createTestElement(), backend: 1, width: 500, height: 300 } });
+    const f = new Factory({ renderer: { elementId: options.elementId, backend: options.backend, width: 500, height: 300 } });
     const system = f.System();
 
     const s1: StaveNoteStruct[] = [

@@ -3,63 +3,74 @@
 //
 // ChordStave Tests - Vitest Version
 
-import { afterAll, beforeAll, describe, test } from 'vitest';
+import { describe, test } from 'vitest';
 
 import { ChordNote } from '../src/chordnote';
 import { ChordStave } from '../src/chordstave';
 import { Flow } from '../src/flow';
-import { Renderer } from '../src/renderer';
+import { ContextBuilder, Renderer } from '../src/renderer';
 import { Barline, BarlineType } from '../src/stavebarline';
-import { createAssert, FONT_STACKS, makeFactory } from './vitest_test_helpers';
-
-/**
- * Helper to create a unique element ID and DOM element for testing
- */
-function createTestElement() {
-  const elementId = 'test_' + Date.now() + '_' + Math.random();
-  const element = document.createElement('canvas');
-  element.id = elementId;
-  document.body.appendChild(element);
-  return elementId;
-}
+import { createAssert, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
 
 describe('ChordStave', () => {
-  let originalFontNames: string[];
+  // Helper function to run a test with multiple backends and font stacks
+  function runTest(
+    testName: string,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    backends: Array<{ backend: number; fontStacks: string[] }> = [
+      { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
+      { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
+    ]
+  ) {
+    backends.forEach(({ backend, fontStacks }) => {
+      fontStacks.forEach((fontStackName) => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+          const elementId = generateTestID('chordstave_test');
 
-  beforeAll(async () => {
-    originalFontNames = Flow.getMusicFont();
-    Flow.setMusicFont(...FONT_STACKS['Bravura']);
-  });
+          // Create the DOM element before the test runs
+          const tagName = backend === Renderer.Backends.SVG ? 'div' : 'canvas';
+          const element = document.createElement(tagName);
+          element.id = elementId;
+          document.body.appendChild(element);
 
-  afterAll(() => {
-    Flow.setMusicFont(...originalFontNames);
-  });
+          const options: TestOptions = { elementId, params: {}, backend };
 
-  test('ChordStave Draw Test', () => {
-    const assert = createAssert();
-    const elementId = createTestElement();
-    const renderer = new Renderer(elementId, Renderer.Backends.CANVAS);
-    renderer.resize(400, 160);
-    const ctx = renderer.getContext();
+          // Set font stack
+          const originalFontNames = Flow.getMusicFont();
+          Flow.setMusicFont(...FONT_STACKS[fontStackName]);
+
+          try {
+            const contextBuilder: ContextBuilder =
+              backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
+            testFunc(options, contextBuilder);
+          } finally {
+            // Restore original font
+            Flow.setMusicFont(...originalFontNames);
+            // Don't remove the element so we can see rendered output
+            // element.remove();
+          }
+        });
+      });
+    });
+  }
+
+  runTest('ChordStave Draw Test', (options: TestOptions, contextBuilder: ContextBuilder) => {
+    const ctx = contextBuilder(options.elementId, 400, 160);
 
     const stave = new ChordStave(10, 10, 300);
     stave.setContext(ctx);
     stave.draw();
 
     // ChordStave doesn't have getYForNote - it only has getYForLine
+    const assert = createAssert();
     assert.equal(stave.getYForLine(5), 145, 'getYForLine(5)');
     assert.equal(stave.getYForLine(0), 70, 'getYForLine(0) - Top Line');
     assert.equal(stave.getYForLine(4), 130, 'getYForLine(4) - Bottom Line');
-
     assert.ok(true, 'all pass');
   });
 
-  test('ChordStave with Time Signature', () => {
-    const assert = createAssert();
-    const elementId = createTestElement();
-    const renderer = new Renderer(elementId, Renderer.Backends.CANVAS);
-    renderer.resize(500, 160);
-    const ctx = renderer.getContext();
+  runTest('ChordStave with Time Signature', (options: TestOptions, contextBuilder: ContextBuilder) => {
+    const ctx = contextBuilder(options.elementId, 500, 160);
 
     const stave = new ChordStave(10, 10, 400);
     stave.setContext(ctx);
@@ -71,19 +82,18 @@ describe('ChordStave', () => {
 
     // Verify modifier was added
     const modifiers = stave.getModifiers();
+    const assert = createAssert();
     assert.equal(modifiers.length, 1, 'Should have 1 modifier');
     assert.ok(true, 'Time signature renders successfully');
   });
 
-  test('Multiple ChordStaves (4x4 Grid)', () => {
-    const assert = createAssert();
-
+  runTest('Multiple ChordStaves (4x4 Grid)', (options: TestOptions) => {
     // Create a large canvas for 4 lines of 4 staves each
     const staveWidth = 200;
     const timeSignatureWidth = 40;
     const padding = 10;
     const canvasWidth = padding + timeSignatureWidth + staveWidth * 4 + timeSignatureWidth + padding;
-    const f = makeFactory(1, createTestElement(), canvasWidth, 400);
+    const f = makeFactory(options.backend, options.elementId, canvasWidth, 400);
 
     const startX = padding + timeSignatureWidth;
     const startY = 10;
@@ -170,6 +180,7 @@ describe('ChordStave', () => {
       }
     }
 
+    const assert = createAssert();
     assert.equal(chordIndex, 16, 'Should render 16 chords');
     assert.ok(true, '16 ChordStaves with chords render successfully');
   });

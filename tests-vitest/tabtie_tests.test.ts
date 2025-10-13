@@ -3,46 +3,26 @@
 //
 // TabTie Tests - Vitest Version
 
-import { afterAll, beforeAll, describe, test } from 'vitest';
+import { describe, test } from 'vitest';
 
 import { Annotation } from '../src/annotation';
 import { Flow } from '../src/flow';
 import { Formatter } from '../src/formatter';
 import { Note } from '../src/note';
 import { RenderContext } from '../src/rendercontext';
-import { Renderer } from '../src/renderer';
+import { ContextBuilder, Renderer } from '../src/renderer';
 import { Stave } from '../src/stave';
 import { TieNotes } from '../src/stavetie';
 import { TabNote, TabNoteStruct } from '../src/tabnote';
 import { TabStave } from '../src/tabstave';
 import { TabTie } from '../src/tabtie';
 import { Voice } from '../src/voice';
-import { createAssert, FONT_STACKS } from './vitest_test_helpers';
-
-function createTestElement() {
-  const elementId = 'test_' + Date.now() + '_' + Math.random();
-  const element = document.createElement('canvas');
-  element.id = elementId;
-  document.body.appendChild(element);
-  return elementId;
-}
+import { createAssert, FONT_STACKS, generateTestID, TestOptions } from './vitest_test_helpers';
 
 /**
  * Helper function to create TabNote objects.
  */
 const tabNote = (noteStruct: TabNoteStruct) => new TabNote(noteStruct);
-
-/**
- * Helper function to create a RenderContext and TabStave.
- */
-function setupContext(elementId: string, w: number = 0, h: number = 0): { context: RenderContext; stave: TabStave } {
-  const context = Renderer.getCanvasContext(elementId, w || 350, h || 160);
-  context.setFont('Arial', 10);
-
-  const stave = new TabStave(10, 10, w || 350).addTabGlyph().setContext(context).draw();
-
-  return { context, stave };
-}
 
 /**
  * Helper function to create the TabTie between two Note objects.
@@ -69,24 +49,56 @@ function tieNotes(notes: Note[], indices: number[], stave: Stave, ctx: RenderCon
 }
 
 describe('TabTie', () => {
-  let originalFontNames: string[];
+  // Helper function to run a test with multiple backends and font stacks
+  function runTest(
+    testName: string,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    backends: Array<{ backend: number; fontStacks: string[] }> = [
+      { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
+      { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
+    ]
+  ) {
+    backends.forEach(({ backend, fontStacks }) => {
+      fontStacks.forEach((fontStackName) => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+          const elementId = generateTestID('tabtie_test');
 
-  beforeAll(async () => {
-    originalFontNames = Flow.getMusicFont();
-    Flow.setMusicFont(...FONT_STACKS['Bravura']);
-  });
+          // Create the DOM element before the test runs
+          const tagName = backend === Renderer.Backends.SVG ? 'div' : 'canvas';
+          const element = document.createElement(tagName);
+          element.id = elementId;
+          document.body.appendChild(element);
 
-  afterAll(() => {
-    Flow.setMusicFont(...originalFontNames);
-  });
+          const assert = createAssert();
+          const options: TestOptions = { elementId, params: {}, backend };
+
+          // Set font stack
+          const originalFontNames = Flow.getMusicFont();
+          Flow.setMusicFont(...FONT_STACKS[fontStackName]);
+
+          try {
+            const contextBuilder: ContextBuilder =
+              backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
+            testFunc(options, contextBuilder);
+          } finally {
+            // Restore original font
+            Flow.setMusicFont(...originalFontNames);
+            // Don't remove the element so we can see rendered output
+            // element.remove();
+          }
+        });
+      });
+    });
+  }
 
   /**
    * Two notes on string 4 with a tie drawn between them.
    */
-  test('Simple TabTie', () => {
+  runTest('Simple TabTie', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = createTestElement();
-    const { context, stave } = setupContext(elementId);
+    const context = contextBuilder(options.elementId, 350, 160);
+    context.setFont('Arial', 10);
+    const stave = new TabStave(10, 10, 350).addTabGlyph().setContext(context).draw();
 
     const note1 = tabNote({ positions: [{ str: 4, fret: 4 }], duration: 'h' });
     const note2 = tabNote({ positions: [{ str: 4, fret: 6 }], duration: 'h' });
@@ -98,107 +110,106 @@ describe('TabTie', () => {
   /**
    * Helper function for the two test cases below (simpleHammerOn and simplePullOff).
    */
-  function multiTest(createTabTie: (notes: TieNotes) => TabTie): void {
-    const assert = createAssert();
-    const elementId = createTestElement();
-    const { context, stave } = setupContext(elementId, 440, 140);
+  function multiTest(testName: string, createTabTie: (notes: TieNotes) => TabTie): void {
+    runTest(testName, (options: TestOptions, contextBuilder: ContextBuilder) => {
+      const assert = createAssert();
+      const context = contextBuilder(options.elementId, 440, 140);
+      context.setFont('Arial', 10);
+      const stave = new TabStave(10, 10, 440).addTabGlyph().setContext(context).draw();
 
-    const notes = [
-      tabNote({ positions: [{ str: 4, fret: 4 }], duration: '8' }),
-      tabNote({ positions: [{ str: 4, fret: 4 }], duration: '8' }),
-      tabNote({
-        positions: [
-          { str: 4, fret: 4 },
-          { str: 5, fret: 4 },
-        ],
-        duration: '8',
-      }),
-      tabNote({
-        positions: [
-          { str: 4, fret: 6 },
-          { str: 5, fret: 6 },
-        ],
-        duration: '8',
-      }),
-      tabNote({ positions: [{ str: 2, fret: 14 }], duration: '8' }),
-      tabNote({ positions: [{ str: 2, fret: 16 }], duration: '8' }),
-      tabNote({
-        positions: [
-          { str: 2, fret: 14 },
-          { str: 3, fret: 14 },
-        ],
-        duration: '8',
-      }),
-      tabNote({
-        positions: [
-          { str: 2, fret: 16 },
-          { str: 3, fret: 16 },
-        ],
-        duration: '8',
-      }),
-    ];
+      const notes = [
+        tabNote({ positions: [{ str: 4, fret: 4 }], duration: '8' }),
+        tabNote({ positions: [{ str: 4, fret: 4 }], duration: '8' }),
+        tabNote({
+          positions: [
+            { str: 4, fret: 4 },
+            { str: 5, fret: 4 },
+          ],
+          duration: '8',
+        }),
+        tabNote({
+          positions: [
+            { str: 4, fret: 6 },
+            { str: 5, fret: 6 },
+          ],
+          duration: '8',
+        }),
+        tabNote({ positions: [{ str: 2, fret: 14 }], duration: '8' }),
+        tabNote({ positions: [{ str: 2, fret: 16 }], duration: '8' }),
+        tabNote({
+          positions: [
+            { str: 2, fret: 14 },
+            { str: 3, fret: 14 },
+          ],
+          duration: '8',
+        }),
+        tabNote({
+          positions: [
+            { str: 2, fret: 16 },
+            { str: 3, fret: 16 },
+          ],
+          duration: '8',
+        }),
+      ];
 
-    const voice = new Voice(Flow.TIME4_4).addTickables(notes);
-    new Formatter().joinVoices([voice]).format([voice], 300);
-    voice.draw(context, stave);
+      const voice = new Voice(Flow.TIME4_4).addTickables(notes);
+      new Formatter().joinVoices([voice]).format([voice], 300);
+      voice.draw(context, stave);
 
-    createTabTie({
-      first_note: notes[0],
-      last_note: notes[1],
-      first_indices: [0],
-      last_indices: [0],
-    })
-      .setContext(context)
-      .draw();
+      createTabTie({
+        first_note: notes[0],
+        last_note: notes[1],
+        first_indices: [0],
+        last_indices: [0],
+      })
+        .setContext(context)
+        .draw();
 
-    assert.ok(true, 'Single note');
+      assert.ok(true, 'Single note');
 
-    createTabTie({
-      first_note: notes[2],
-      last_note: notes[3],
-      first_indices: [0, 1],
-      last_indices: [0, 1],
-    })
-      .setContext(context)
-      .draw();
+      createTabTie({
+        first_note: notes[2],
+        last_note: notes[3],
+        first_indices: [0, 1],
+        last_indices: [0, 1],
+      })
+        .setContext(context)
+        .draw();
 
-    assert.ok(true, 'Chord');
+      assert.ok(true, 'Chord');
 
-    createTabTie({
-      first_note: notes[4],
-      last_note: notes[5],
-      first_indices: [0],
-      last_indices: [0],
-    })
-      .setContext(context)
-      .draw();
+      createTabTie({
+        first_note: notes[4],
+        last_note: notes[5],
+        first_indices: [0],
+        last_indices: [0],
+      })
+        .setContext(context)
+        .draw();
 
-    assert.ok(true, 'Single note high-fret');
+      assert.ok(true, 'Single note high-fret');
 
-    createTabTie({
-      first_note: notes[6],
-      last_note: notes[7],
-      first_indices: [0, 1],
-      last_indices: [0, 1],
-    })
-      .setContext(context)
-      .draw();
+      createTabTie({
+        first_note: notes[6],
+        last_note: notes[7],
+        first_indices: [0, 1],
+        last_indices: [0, 1],
+      })
+        .setContext(context)
+        .draw();
 
-    assert.ok(true, 'Chord high-fret');
+      assert.ok(true, 'Chord high-fret');
+    });
   }
 
-  test('Hammerons', () => {
-    multiTest(TabTie.createHammeron);
-  });
+  multiTest('Hammerons', TabTie.createHammeron);
+  multiTest('Pulloffs', TabTie.createPulloff);
 
-  test('Pulloffs', () => {
-    multiTest(TabTie.createPulloff);
-  });
-
-  test('Tapping', () => {
+  runTest('Tapping', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = createTestElement();
-    const { context, stave } = setupContext(elementId);
+    const context = contextBuilder(options.elementId, 350, 160);
+    context.setFont('Arial', 10);
+    const stave = new TabStave(10, 10, 350).addTabGlyph().setContext(context).draw();
 
     const note1 = tabNote({ positions: [{ str: 4, fret: 12 }], duration: 'h' }).addModifier(new Annotation('T'), 0);
     const note2 = tabNote({ positions: [{ str: 4, fret: 10 }], duration: 'h' });
@@ -207,10 +218,11 @@ describe('TabTie', () => {
     assert.ok(true, 'Tapping Test');
   });
 
-  test('Continuous', () => {
+  runTest('Continuous', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = createTestElement();
-    const { context, stave } = setupContext(elementId, 440, 140);
+    const context = contextBuilder(options.elementId, 440, 140);
+    context.setFont('Arial', 10);
+    const stave = new TabStave(10, 10, 440).addTabGlyph().setContext(context).draw();
 
     const notes = [
       tabNote({ positions: [{ str: 4, fret: 4 }], duration: 'q' }),

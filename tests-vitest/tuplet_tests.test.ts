@@ -3,22 +3,15 @@
 //
 // Tuplet Tests
 
-import { afterAll, beforeAll, describe, test } from 'vitest';
+import { describe, test } from 'vitest';
 
 import { Dot } from '../src/dot';
 import { Flow } from '../src/flow';
 import { Formatter } from '../src/formatter';
+import { ContextBuilder, Renderer } from '../src/renderer';
 import { Stem } from '../src/stem';
 import { Tuplet } from '../src/tuplet';
-import { createAssert, FONT_STACKS, makeFactory } from './vitest_test_helpers';
-
-function createTestElement() {
-  const elementId = 'test_' + Date.now() + '_' + Math.random();
-  const element = document.createElement('canvas');
-  element.id = elementId;
-  document.body.appendChild(element);
-  return elementId;
-}
+import { createAssert, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
 
 // Helper Functions to set the stem direction and duration of the options objects (i.e., StaveNoteStruct)
 // that are ultimately passed into Factory.StaveNote().
@@ -33,20 +26,48 @@ const setStemDown = setStemDirection(Stem.DOWN);
 const setDurationToQuarterNote = set('duration')('4');
 
 describe('Tuplet', () => {
-  let originalFontNames: string[];
+  // Helper function to run a test with multiple backends and font stacks
+  function runTest(
+    testName: string,
+    testFunc: (options: TestOptions) => void,
+    backends: Array<{ backend: number; fontStacks: string[] }> = [
+      { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
+      { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
+    ]
+  ) {
+    backends.forEach(({ backend, fontStacks }) => {
+      fontStacks.forEach((fontStackName) => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+          const elementId = generateTestID('tuplet_test');
 
-  beforeAll(async () => {
-    originalFontNames = Flow.getMusicFont();
-    Flow.setMusicFont(...FONT_STACKS['Bravura']);
-  });
+          // Create the DOM element before the test runs
+          const tagName = backend === Renderer.Backends.SVG ? 'div' : 'canvas';
+          const element = document.createElement(tagName);
+          element.id = elementId;
+          document.body.appendChild(element);
 
-  afterAll(() => {
-    Flow.setMusicFont(...originalFontNames);
-  });
+          const options: TestOptions = { elementId, params: {}, backend };
 
-  test('Simple Tuplet', () => {
+          // Set font stack
+          const originalFontNames = Flow.getMusicFont();
+          Flow.setMusicFont(...FONT_STACKS[fontStackName]);
+
+          try {
+            testFunc(options);
+          } finally {
+            // Restore original font
+            Flow.setMusicFont(...originalFontNames);
+            // Don't remove the element so we can see rendered output
+            // element.remove();
+          }
+        });
+      });
+    });
+  }
+
+  runTest('Simple Tuplet', (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement());
+    const f = makeFactory(options.backend, options.elementId);
     const stave = f.Stave({ x: 10, y: 10, width: 350 }).addTimeSignature('3/4');
 
     const notes = [
@@ -76,9 +97,9 @@ describe('Tuplet', () => {
     assert.ok(true, 'Simple Test');
   });
 
-  test('Beamed Tuplet', () => {
+  runTest('Beamed Tuplet', (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement());
+    const f = makeFactory(options.backend, options.elementId);
     const stave = f.Stave({ x: 10, y: 10, width: 350 }).addTimeSignature('3/8');
 
     const notes = [
@@ -114,9 +135,9 @@ describe('Tuplet', () => {
     assert.ok(true, 'Beamed Test');
   });
 
-  test('Ratioed Tuplet', () => {
+  runTest('Ratioed Tuplet', (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement());
+    const f = makeFactory(options.backend, options.elementId);
     const stave = f.Stave({ x: 10, y: 10, width: 350 }).addTimeSignature('4/4');
 
     const notes = [
@@ -158,9 +179,9 @@ describe('Tuplet', () => {
     assert.ok(true, 'Ratioed Test');
   });
 
-  test('Bottom Tuplet', () => {
+  runTest('Bottom Tuplet', (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 350, 160);
+    const f = makeFactory(options.backend, options.elementId, 350, 160);
     const stave = f.Stave({ x: 10, y: 10 }).addTimeSignature('3/4');
 
     const notes = [
@@ -200,9 +221,9 @@ describe('Tuplet', () => {
     assert.ok(true, 'Bottom Test');
   });
 
-  test('Bottom Ratioed Tuplet', () => {
+  runTest('Bottom Ratioed Tuplet', (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 350, 160);
+    const f = makeFactory(options.backend, options.elementId, 350, 160);
     const stave = f.Stave({ x: 10, y: 10 }).addTimeSignature('5/8');
 
     const notes = [
@@ -248,9 +269,9 @@ describe('Tuplet', () => {
     assert.ok(true, 'Bottom Ratioed Test');
   });
 
-  test('Awkward Tuplet', () => {
+  runTest('Awkward Tuplet', (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 370, 160);
+    const f = makeFactory(options.backend, options.elementId, 370, 160);
     const stave = f.Stave({ x: 10, y: 10 });
 
     const notes = [
@@ -298,9 +319,9 @@ describe('Tuplet', () => {
     assert.ok(true, 'Awkward Test');
   });
 
-  test('Complex Tuplet', () => {
+  runTest('Complex Tuplet', (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement(), 600);
+    const f = makeFactory(options.backend, options.elementId, 600);
     const stave = f.Stave({ x: 10, y: 10 }).addTimeSignature('4/4');
 
     const notes1 = [
@@ -366,9 +387,9 @@ describe('Tuplet', () => {
     assert.ok(true, 'Complex Test');
   });
 
-  test('Mixed Stem Direction Tuplet', () => {
+  runTest('Mixed Stem Direction Tuplet', (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement());
+    const f = makeFactory(options.backend, options.elementId);
     const stave = f.Stave({ x: 10, y: 10 });
 
     const notes = [
@@ -412,9 +433,9 @@ describe('Tuplet', () => {
     assert.ok(true, 'Mixed Stem Direction Tuplet');
   });
 
-  test('Mixed Stem Direction Bottom Tuplet', () => {
+  runTest('Mixed Stem Direction Bottom Tuplet', (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement());
+    const f = makeFactory(options.backend, options.elementId);
     const stave = f.Stave({ x: 10, y: 10 });
 
     const notes = [
@@ -458,9 +479,9 @@ describe('Tuplet', () => {
     assert.ok(true, 'Mixed Stem Direction Bottom Tuplet');
   });
 
-  test('Nested Tuplets', () => {
+  runTest('Nested Tuplets', (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement());
+    const f = makeFactory(options.backend, options.elementId);
     const stave = f.Stave({ x: 10, y: 10 }).addTimeSignature('4/4');
 
     const notes = [
@@ -507,9 +528,9 @@ describe('Tuplet', () => {
     assert.ok(true, 'Nested Tuplets');
   });
 
-  test('Single Tuplets', () => {
+  runTest('Single Tuplets', (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(1, createTestElement());
+    const f = makeFactory(options.backend, options.elementId);
     const stave = f.Stave({ x: 10, y: 10 }).addTimeSignature('4/4');
 
     const notes = [

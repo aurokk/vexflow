@@ -3,7 +3,7 @@
 //
 // Bend Tests - Vitest Version
 
-import { afterAll, beforeAll, describe, test } from 'vitest';
+import { describe, test } from 'vitest';
 
 import { Bend, BendPhrase } from '../src/bend';
 import { Flow } from '../src/flow';
@@ -15,40 +15,50 @@ import { Renderer } from '../src/renderer';
 import { TabNote, TabNoteStruct } from '../src/tabnote';
 import { TabStave } from '../src/tabstave';
 import { TickContext } from '../src/tickcontext';
-import { createAssert, FONT_STACKS } from './vitest_test_helpers';
+import { ContextBuilder, createAssert, FONT_STACKS, generateTestID, TestOptions } from './vitest_test_helpers';
 
 // Helper functions for creating TabNote and Bend objects.
 const note = (noteStruct: TabNoteStruct) => new TabNote(noteStruct);
 const bendWithText = (text: string, release = false) => new Bend(text, release);
 const bendWithPhrase = (phrase: BendPhrase[]) => new Bend('', false, phrase);
 
-/**
- * Helper to create a unique element ID and DOM element for testing
- */
-function createTestElement() {
-  const elementId = 'test_' + Date.now() + '_' + Math.random();
-  const element = document.createElement('canvas');
-  element.id = elementId;
-  document.body.appendChild(element);
-  return elementId;
-}
-
 describe('Bend', () => {
-  let originalFontNames: string[];
+  function runTest(
+    testName: string,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    backends: Array<{ backend: number; fontStacks: string[] }> = [
+      { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
+      { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
+    ]
+  ) {
+    backends.forEach(({ backend, fontStacks }) => {
+      fontStacks.forEach((fontStackName) => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+          const elementId = generateTestID('test');
+          const tagName = backend === Renderer.Backends.SVG ? 'div' : 'canvas';
+          const element = document.createElement(tagName);
+          element.id = elementId;
+          document.body.appendChild(element);
 
-  beforeAll(async () => {
-    originalFontNames = Flow.getMusicFont();
-    Flow.setMusicFont(...FONT_STACKS['Bravura']);
-  });
+          const options: TestOptions = { elementId, params: {}, backend };
+          const originalFontNames = Flow.getMusicFont();
+          Flow.setMusicFont(...FONT_STACKS[fontStackName]);
 
-  afterAll(() => {
-    Flow.setMusicFont(...originalFontNames);
-  });
-
-  test('Double Bends', () => {
+          try {
+            const contextBuilder: ContextBuilder =
+              backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
+            testFunc(options, contextBuilder);
+          } finally {
+            Flow.setMusicFont(...originalFontNames);
+          }
+        });
+      });
+    });
+  }
+  runTest('Double Bends', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = createTestElement();
-    const renderer = new Renderer(elementId, Renderer.Backends.CANVAS);
+    
+    const renderer = new Renderer(options.elementId, options.backend);
     renderer.resize(500, 240);
     const ctx = renderer.getContext();
     ctx.scale(1.5, 1.5);
@@ -90,10 +100,10 @@ describe('Bend', () => {
     assert.ok(true, 'Double Bends');
   });
 
-  test('Reverse Bends', () => {
+  runTest('Reverse Bends', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = createTestElement();
-    const renderer = new Renderer(elementId, Renderer.Backends.CANVAS);
+    
+    const renderer = new Renderer(options.elementId, options.backend);
     renderer.resize(500, 240);
     const ctx = renderer.getContext();
 
@@ -147,10 +157,10 @@ describe('Bend', () => {
     }
   });
 
-  test('Bend Phrase', () => {
+  runTest('Bend Phrase', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = createTestElement();
-    const renderer = new Renderer(elementId, Renderer.Backends.CANVAS);
+    
+    const renderer = new Renderer(options.elementId, options.backend);
     renderer.resize(500, 240);
     const ctx = renderer.getContext();
     ctx.scale(1.5, 1.5);
@@ -189,10 +199,10 @@ describe('Bend', () => {
     }
   });
 
-  test('Double Bends With Release', () => {
+  runTest('Double Bends With Release', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = createTestElement();
-    const renderer = new Renderer(elementId, Renderer.Backends.CANVAS);
+    
+    const renderer = new Renderer(options.elementId, options.backend);
     renderer.resize(550, 240);
     const ctx = renderer.getContext();
     ctx.scale(1.0, 1.0);
@@ -238,10 +248,10 @@ describe('Bend', () => {
     assert.ok(true, 'Bend Release');
   });
 
-  test('Whako Bend', () => {
+  runTest('Whako Bend', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = createTestElement();
-    const renderer = new Renderer(elementId, Renderer.Backends.CANVAS);
+    
+    const renderer = new Renderer(options.elementId, options.backend);
     renderer.resize(400, 240);
     const ctx = renderer.getContext();
     ctx.scale(1.0, 1.0);

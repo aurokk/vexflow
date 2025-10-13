@@ -10,21 +10,13 @@ import { Flow } from '../src/flow';
 import { Font, FontWeight } from '../src/font';
 import { Formatter } from '../src/formatter';
 import { RenderContext } from '../src/rendercontext';
-import { Renderer } from '../src/renderer';
+import { ContextBuilder, Renderer } from '../src/renderer';
 import { Stave } from '../src/stave';
 import { TabNote, TabNoteStruct } from '../src/tabnote';
 import { TabStave } from '../src/tabstave';
 import { TickContext } from '../src/tickcontext';
 import { Voice, VoiceMode } from '../src/voice';
-import { createAssert, FONT_STACKS } from './vitest_test_helpers';
-
-function createTestElement() {
-  const elementId = 'test_' + Date.now() + '_' + Math.random();
-  const element = document.createElement('canvas');
-  element.id = elementId;
-  document.body.appendChild(element);
-  return elementId;
-}
+import { createAssert, FONT_STACKS, generateTestID, TestOptions } from './vitest_test_helpers';
 
 describe('TabNote', () => {
   let originalFontNames: string[];
@@ -37,6 +29,48 @@ describe('TabNote', () => {
   afterAll(() => {
     Flow.setMusicFont(...originalFontNames);
   });
+
+  // Helper function to run a test with multiple backends and font stacks
+  function runTest(
+    testName: string,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    backends: Array<{ backend: number; fontStacks: string[] }> = [
+      { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
+      { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
+    ]
+  ) {
+    backends.forEach(({ backend, fontStacks }) => {
+      fontStacks.forEach((fontStackName) => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+          const elementId = generateTestID('tabnote_test');
+
+          // Create the DOM element before the test runs
+          const tagName = backend === Renderer.Backends.SVG ? 'div' : 'canvas';
+          const element = document.createElement(tagName);
+          element.id = elementId;
+          document.body.appendChild(element);
+
+          const assert = createAssert();
+          const options: TestOptions = { elementId, params: {}, backend };
+
+          // Set font stack
+          const originalFontNames = Flow.getMusicFont();
+          Flow.setMusicFont(...FONT_STACKS[fontStackName]);
+
+          try {
+            const contextBuilder: ContextBuilder =
+              backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
+            testFunc(options, contextBuilder);
+          } finally {
+            // Restore original font
+            Flow.setMusicFont(...originalFontNames);
+            // Don't remove the element so we can see rendered output
+            // element.remove();
+          }
+        });
+      });
+    });
+  }
 
   test('Tick', () => {
     const assert = createAssert();
@@ -102,10 +136,9 @@ describe('TabNote', () => {
     assert.equal(tickContext.getWidth(), 7);
   });
 
-  test('TabNote Draw', () => {
+  runTest('TabNote Draw', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = createTestElement();
-    const ctx = Renderer.getCanvasContext(elementId, 600, 140);
+    const ctx = contextBuilder(options.elementId, 600, 140);
     ctx.font = '10pt Arial';
     const stave = new TabStave(10, 10, 550);
     stave.setContext(ctx);
@@ -180,10 +213,9 @@ describe('TabNote', () => {
     }
   });
 
-  test('TabNote Stems Up', () => {
+  runTest('TabNote Stems Up', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = createTestElement();
-    const ctx = Renderer.getCanvasContext(elementId, 600, 200);
+    const ctx = contextBuilder(options.elementId, 600, 200);
     ctx.font = '10pt Arial';
     const stave = new TabStave(10, 30, 550);
     stave.setContext(ctx);
@@ -254,10 +286,9 @@ describe('TabNote', () => {
     assert.ok(true, 'TabNotes successfully drawn');
   });
 
-  test('TabNote Stems Down', () => {
+  runTest('TabNote Stems Down', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = createTestElement();
-    const ctx = Renderer.getCanvasContext(elementId, 600, 200);
+    const ctx = contextBuilder(options.elementId, 600, 200);
     ctx.font = '10pt Arial';
     const stave = new TabStave(10, 10, 550);
     stave.setContext(ctx);
@@ -329,10 +360,9 @@ describe('TabNote', () => {
     assert.ok(true, 'All objects have been drawn');
   });
 
-  test('TabNote Stems Up Through Stave', () => {
+  runTest('TabNote Stems Up Through Stave', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = createTestElement();
-    const ctx = Renderer.getCanvasContext(elementId, 600, 200);
+    const ctx = contextBuilder(options.elementId, 600, 200);
     ctx.font = '10pt Arial';
     const stave = new TabStave(10, 30, 550);
     stave.setContext(ctx);
@@ -405,10 +435,9 @@ describe('TabNote', () => {
     assert.ok(true, 'TabNotes successfully drawn');
   });
 
-  test('TabNote Stems Down Through Stave', () => {
+  runTest('TabNote Stems Down Through Stave', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = createTestElement();
-    const ctx = Renderer.getCanvasContext(elementId, 600, 250);
+    const ctx = contextBuilder(options.elementId, 600, 250);
     ctx.font = '10pt Arial';
     const stave = new TabStave(10, 10, 550, { num_lines: 8 });
     stave.setContext(ctx);
@@ -486,10 +515,9 @@ describe('TabNote', () => {
     assert.ok(true, 'All objects have been drawn');
   });
 
-  test('TabNote Stems with Dots', () => {
+  runTest('TabNote Stems with Dots', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = createTestElement();
-    const ctx = Renderer.getCanvasContext(elementId, 600, 200);
+    const ctx = contextBuilder(options.elementId, 600, 200);
     ctx.font = '10pt Arial';
     const stave = new TabStave(10, 10, 550);
     stave.setContext(ctx);

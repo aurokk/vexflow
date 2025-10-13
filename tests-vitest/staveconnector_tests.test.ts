@@ -5,40 +5,62 @@
 
 // TODO: Should we change StaveConnector.type => StaveConnectorType? We are inconsistent with this.
 
-import { afterAll, beforeAll, describe, test } from 'vitest';
+import { describe, test } from 'vitest';
 
 import { Flow } from '../src/flow';
 import { Modifier } from '../src/modifier';
-import { Renderer } from '../src/renderer';
+import { ContextBuilder, Renderer } from '../src/renderer';
 import { Stave } from '../src/stave';
 import { BarlineType } from '../src/stavebarline';
 import { StaveConnector } from '../src/staveconnector';
-import { createAssert, FONT_STACKS } from './vitest_test_helpers';
+import { createAssert, FONT_STACKS, generateTestID, TestOptions } from './vitest_test_helpers';
 
 describe('StaveConnector', () => {
-  let originalMusicFont: string[];
+  // Helper function to run a test with multiple backends and font stacks
+  function runTest(
+    testName: string,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    backends: Array<{ backend: number; fontStacks: string[] }> = [
+      { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
+      { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
+    ]
+  ) {
+    backends.forEach(({ backend, fontStacks }) => {
+      fontStacks.forEach((fontStackName) => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+          const elementId = generateTestID('staveconnector_test');
 
-  beforeAll(async () => {
-    originalMusicFont = Flow.getMusicFont();
-    Flow.setMusicFont(...FONT_STACKS['Bravura']);
-  });
+          // Create the DOM element before the test runs
+          const tagName = backend === Renderer.Backends.SVG ? 'div' : 'canvas';
+          const element = document.createElement(tagName);
+          element.id = elementId;
+          document.body.appendChild(element);
 
-  afterAll(() => {
-    Flow.setMusicFont(...originalMusicFont);
-  });
+          const assert = createAssert();
+          const options: TestOptions = { elementId, params: {}, backend };
 
-  function createTestElement(): string {
-    const elementId = `vexflow-test-${Date.now()}-${Math.random().toString(36).substring(7)}`;
-    const element = document.createElement('canvas');
-    element.id = elementId;
-    document.body.appendChild(element);
-    return elementId;
+          // Set font stack
+          const originalFontNames = Flow.getMusicFont();
+          Flow.setMusicFont(...FONT_STACKS[fontStackName]);
+
+          try {
+            const contextBuilder: ContextBuilder =
+              backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
+            testFunc(options, contextBuilder);
+          } finally {
+            // Restore original font
+            Flow.setMusicFont(...originalFontNames);
+            // Don't remove the element so we can see rendered output
+            // element.remove();
+          }
+        });
+      });
+    });
   }
 
-  test('Single Draw Test', () => {
-    const elementId = createTestElement();
+  runTest('Single Draw Test', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const ctx = Renderer.getCanvasContext(elementId, 400, 300);
+    const ctx = contextBuilder(options.elementId, 400, 300);
     const stave1 = new Stave(25, 10, 300);
     const stave2 = new Stave(25, 120, 300);
     stave1.setContext(ctx);
@@ -53,12 +75,11 @@ describe('StaveConnector', () => {
     assert.ok(true, 'all pass');
   });
 
-  test('Single Draw Test, 4px Stave Line Thickness', () => {
-    const elementId = createTestElement();
+  runTest('Single Draw Test, 4px Stave Line Thickness', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const oldThickness = Flow.STAVE_LINE_THICKNESS;
     Flow.STAVE_LINE_THICKNESS = 4;
-    const ctx = Renderer.getCanvasContext(elementId, 400, 300);
+    const ctx = contextBuilder(options.elementId, 400, 300);
     const stave1 = new Stave(25, 10, 300);
     const stave2 = new Stave(25, 120, 300);
     stave1.setContext(ctx);
@@ -74,10 +95,9 @@ describe('StaveConnector', () => {
     assert.ok(true, 'all pass');
   });
 
-  test('Single Both Sides Test', () => {
-    const elementId = createTestElement();
+  runTest('Single Both Sides Test', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const ctx = Renderer.getCanvasContext(elementId, 400, 300);
+    const ctx = contextBuilder(options.elementId, 400, 300);
     const stave1 = new Stave(25, 10, 300);
     const stave2 = new Stave(25, 120, 300);
     stave1.setContext(ctx);
@@ -96,10 +116,9 @@ describe('StaveConnector', () => {
     assert.ok(true, 'all pass');
   });
 
-  test('Double Draw Test', () => {
-    const elementId = createTestElement();
+  runTest('Double Draw Test', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const ctx = Renderer.getCanvasContext(elementId, 400, 300);
+    const ctx = contextBuilder(options.elementId, 400, 300);
     const stave1 = new Stave(25, 10, 300);
     const stave2 = new Stave(25, 120, 300);
     stave1.setContext(ctx);
@@ -119,10 +138,9 @@ describe('StaveConnector', () => {
     assert.ok(true, 'all pass');
   });
 
-  test('Bold Double Line Left Draw Test', () => {
-    const elementId = createTestElement();
+  runTest('Bold Double Line Left Draw Test', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const ctx = Renderer.getCanvasContext(elementId, 400, 300);
+    const ctx = contextBuilder(options.elementId, 400, 300);
     const stave1 = new Stave(25, 10, 300);
     const stave2 = new Stave(25, 120, 300);
     stave1.setContext(ctx);
@@ -140,10 +158,9 @@ describe('StaveConnector', () => {
     assert.ok(true, 'all pass');
   });
 
-  test('Bold Double Line Right Draw Test', () => {
-    const elementId = createTestElement();
+  runTest('Bold Double Line Right Draw Test', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const ctx = Renderer.getCanvasContext(elementId, 400, 300);
+    const ctx = contextBuilder(options.elementId, 400, 300);
     const stave1 = new Stave(25, 10, 300);
     const stave2 = new Stave(25, 120, 300);
     stave1.setContext(ctx);
@@ -161,10 +178,9 @@ describe('StaveConnector', () => {
     assert.ok(true, 'all pass');
   });
 
-  test('Thin Double Line Right Draw Test', () => {
-    const elementId = createTestElement();
+  runTest('Thin Double Line Right Draw Test', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const ctx = Renderer.getCanvasContext(elementId, 400, 300);
+    const ctx = contextBuilder(options.elementId, 400, 300);
     const stave1 = new Stave(25, 10, 300);
     const stave2 = new Stave(25, 120, 300);
     stave1.setContext(ctx);
@@ -182,10 +198,9 @@ describe('StaveConnector', () => {
     assert.ok(true, 'all pass');
   });
 
-  test('Bold Double Lines Overlapping Draw Test', () => {
-    const elementId = createTestElement();
+  runTest('Bold Double Lines Overlapping Draw Test', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const ctx = Renderer.getCanvasContext(elementId, 400, 300);
+    const ctx = contextBuilder(options.elementId, 400, 300);
     const stave1 = new Stave(25, 10, 150);
     const stave2 = new Stave(25, 120, 150);
     const stave3 = new Stave(175, 10, 150);
@@ -228,10 +243,9 @@ describe('StaveConnector', () => {
     assert.ok(true, 'all pass');
   });
 
-  test('Bold Double Lines Offset Draw Test', () => {
-    const elementId = createTestElement();
+  runTest('Bold Double Lines Offset Draw Test', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const ctx = Renderer.getCanvasContext(elementId, 400, 300);
+    const ctx = contextBuilder(options.elementId, 400, 300);
     const stave1 = new Stave(25, 10, 150);
     const stave2 = new Stave(25, 120, 150);
     const stave3 = new Stave(185, 10, 150);
@@ -298,10 +312,9 @@ describe('StaveConnector', () => {
     assert.ok(true, 'all pass');
   });
 
-  test('Bold Double Lines Offset Draw Test 2', () => {
-    const elementId = createTestElement();
+  runTest('Bold Double Lines Offset Draw Test 2', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const ctx = Renderer.getCanvasContext(elementId, 400, 300);
+    const ctx = contextBuilder(options.elementId, 400, 300);
     const stave1 = new Stave(25, 10, 150);
     const stave2 = new Stave(25, 120, 150);
     const stave3 = new Stave(175, 10, 150);
@@ -365,10 +378,9 @@ describe('StaveConnector', () => {
     assert.ok(true, 'all pass');
   });
 
-  test('Brace Draw Test', () => {
-    const elementId = createTestElement();
+  runTest('Brace Draw Test', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const ctx = Renderer.getCanvasContext(elementId, 450, 300);
+    const ctx = contextBuilder(options.elementId, 450, 300);
     const stave1 = new Stave(100, 10, 300);
     const stave2 = new Stave(100, 120, 300);
     stave1.setContext(ctx);
@@ -389,10 +401,9 @@ describe('StaveConnector', () => {
     assert.ok(true, 'all pass');
   });
 
-  test('Brace Wide Draw Test', () => {
-    const elementId = createTestElement();
+  runTest('Brace Wide Draw Test', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const ctx = Renderer.getCanvasContext(elementId, 400, 300);
+    const ctx = contextBuilder(options.elementId, 400, 300);
     const stave1 = new Stave(25, -20, 300);
     const stave2 = new Stave(25, 200, 300);
     stave1.setContext(ctx);
@@ -412,10 +423,9 @@ describe('StaveConnector', () => {
     assert.ok(true, 'all pass');
   });
 
-  test('Bracket Draw Test', () => {
-    const elementId = createTestElement();
+  runTest('Bracket Draw Test', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const ctx = Renderer.getCanvasContext(elementId, 400, 300);
+    const ctx = contextBuilder(options.elementId, 400, 300);
     const stave1 = new Stave(25, 10, 300);
     const stave2 = new Stave(25, 120, 300);
     stave1.setContext(ctx);
@@ -435,10 +445,9 @@ describe('StaveConnector', () => {
     assert.ok(true, 'all pass');
   });
 
-  test('Combined Draw Test', () => {
-    const elementId = createTestElement();
+  runTest('Combined Draw Test', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const ctx = Renderer.getCanvasContext(elementId, 550, 700);
+    const ctx = contextBuilder(options.elementId, 550, 700);
     const stave1 = new Stave(150, 10, 300);
     const stave2 = new Stave(150, 100, 300);
     const stave3 = new Stave(150, 190, 300);

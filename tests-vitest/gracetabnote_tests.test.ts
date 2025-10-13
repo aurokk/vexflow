@@ -3,49 +3,68 @@
 //
 // GraceTabNote Tests - Vitest Version
 
-import { afterAll, beforeAll, describe, test } from 'vitest';
+import { describe, test } from 'vitest';
 
 import { Flow } from '../src/flow';
 import { Formatter } from '../src/formatter';
 import { GraceNoteGroup } from '../src/gracenotegroup';
 import { GraceTabNote } from '../src/gracetabnote';
-import { Renderer } from '../src/renderer';
+import { ContextBuilder, Renderer } from '../src/renderer';
 import { TabNote, TabNoteStruct } from '../src/tabnote';
 import { TabStave } from '../src/tabstave';
 import { Voice } from '../src/voice';
-import { createAssert, FONT_STACKS } from './vitest_test_helpers';
-
-/**
- * Helper to create a unique element ID and DOM element for testing
- */
-function createTestElement() {
-  const elementId = 'test_' + Date.now() + '_' + Math.random();
-  const element = document.createElement('canvas');
-  element.id = elementId;
-  document.body.appendChild(element);
-  return elementId;
-}
+import { createAssert, FONT_STACKS, generateTestID, TestOptions } from './vitest_test_helpers';
 
 // Helper functions to create TabNote and GraceTabNote objects.
 const tabNote = (noteStruct: TabNoteStruct) => new TabNote(noteStruct);
 const graceTabNote = (noteStruct: TabNoteStruct) => new GraceTabNote(noteStruct);
 
 describe('Grace Tab Notes', () => {
-  let originalFontNames: string[];
+  // Helper function to run a test with multiple backends and font stacks
+  function runTest(
+    testName: string,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    backends: Array<{ backend: number; fontStacks: string[] }> = [
+      { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
+      { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
+    ]
+  ) {
+    backends.forEach(({ backend, fontStacks }) => {
+      fontStacks.forEach((fontStackName) => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+          const elementId = generateTestID('gracetabnote_test');
 
-  beforeAll(async () => {
-    originalFontNames = Flow.getMusicFont();
-    Flow.setMusicFont(...FONT_STACKS['Bravura']);
-  });
+          // Create the DOM element before the test runs
+          const tagName = backend === Renderer.Backends.SVG ? 'div' : 'canvas';
+          const element = document.createElement(tagName);
+          element.id = elementId;
+          document.body.appendChild(element);
 
-  afterAll(() => {
-    Flow.setMusicFont(...originalFontNames);
-  });
+          const assert = createAssert();
+          const options: TestOptions = { elementId, params: {}, backend };
 
-  test('Grace Tab Note Simple', () => {
+          // Set font stack
+          const originalFontNames = Flow.getMusicFont();
+          Flow.setMusicFont(...FONT_STACKS[fontStackName]);
+
+          try {
+            const contextBuilder: ContextBuilder =
+              backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
+            testFunc(options, contextBuilder);
+          } finally {
+            // Restore original font
+            Flow.setMusicFont(...originalFontNames);
+            // Don't remove the element so we can see rendered output
+            // element.remove();
+          }
+        });
+      });
+    });
+  }
+
+  runTest('Grace Tab Note Simple', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = createTestElement();
-    const context = Renderer.getCanvasContext(elementId, 350, 140);
+    const context = contextBuilder(options.elementId, 350, 140);
     const stave = new TabStave(10, 10, 350).addTabGlyph().setContext(context).draw();
 
     const note0 = tabNote({ positions: [{ str: 4, fret: 6 }], duration: '4' });
@@ -87,10 +106,9 @@ describe('Grace Tab Notes', () => {
     assert.ok(true, 'Simple Test');
   });
 
-  test('Grace Tab Note Slurred', () => {
+  runTest('Grace Tab Note Slurred', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const elementId = createTestElement();
-    const context = Renderer.getCanvasContext(elementId, 350, 140);
+    const context = contextBuilder(options.elementId, 350, 140);
     const stave = new TabStave(10, 10, 350).addTabGlyph().setContext(context).draw();
 
     const note0 = tabNote({ positions: [{ str: 4, fret: 12 }], duration: 'h' });

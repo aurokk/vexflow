@@ -5,26 +5,16 @@
 
 import { BoundingBoxComputation, Factory, Glyph, OutlineCode, RenderContext } from '../src/index';
 
-import { afterAll, beforeAll, describe, test } from 'vitest';
+import { describe, test } from 'vitest';
 
 import { Flow } from '../src/flow';
-import { createAssert, FONT_STACKS } from './vitest_test_helpers';
-
-/**
- * Helper to create a unique element ID and DOM element for testing
- */
-function createTestElement() {
-  const elementId = 'test_' + Date.now() + '_' + Math.random();
-  const element = document.createElement('canvas');
-  element.id = elementId;
-  document.body.appendChild(element);
-  return elementId;
-}
+import { ContextBuilder, Renderer } from '../src/renderer';
+import { createAssert, FONT_STACKS, generateTestID, TestOptions } from './vitest_test_helpers';
 
 /**
  * Size the context to fit all the points and a small margin.
  */
-function createContext(points: number[]): RenderContext {
+function createContext(backend: number, elementId: string, points: number[]): RenderContext {
   let w = points[0];
   let h = points[1];
   for (let i = 2; i < points.length; i += 2) {
@@ -32,7 +22,7 @@ function createContext(points: number[]): RenderContext {
     h = Math.max(h, points[i + 1]);
   }
 
-  const f = new Factory({ renderer: { elementId: createTestElement(), backend: 1, width: w + 20, height: h + 20 } });
+  const f = new Factory({ renderer: { elementId, backend, width: w + 20, height: h + 20 } });
   const ctx = f.getContext();
   ctx.setLineCap('square');
   return ctx;
@@ -122,16 +112,47 @@ const cubicParams = [
 ];
 
 describe('BoundingBoxComputation', () => {
-  let originalFontNames: string[];
+  // Helper function to run a test with multiple backends and font stacks
+  function runTest(
+    testName: string,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    backends: Array<{ backend: number; fontStacks: string[] }> = [
+      { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
+      { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
+    ]
+  ) {
+    backends.forEach(({ backend, fontStacks }) => {
+      fontStacks.forEach((fontStackName) => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+          const elementId = generateTestID('boundingboxcomputation_test');
 
-  beforeAll(async () => {
-    originalFontNames = Flow.getMusicFont();
-    Flow.setMusicFont(...FONT_STACKS['Bravura']);
-  });
+          // Create the DOM element before the test runs
+          const tagName = backend === Renderer.Backends.SVG ? 'div' : 'canvas';
+          const element = document.createElement(tagName);
+          element.id = elementId;
+          document.body.appendChild(element);
 
-  afterAll(() => {
-    Flow.setMusicFont(...originalFontNames);
-  });
+          const assert = createAssert();
+          const options: TestOptions = { elementId, params: {}, backend };
+
+          // Set font stack
+          const originalFontNames = Flow.getMusicFont();
+          Flow.setMusicFont(...FONT_STACKS[fontStackName]);
+
+          try {
+            const contextBuilder: ContextBuilder =
+              backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
+            testFunc(options, contextBuilder);
+          } finally {
+            // Restore original font
+            Flow.setMusicFont(...originalFontNames);
+            // Don't remove the element so we can see rendered output
+            // element.remove();
+          }
+        });
+      });
+    });
+  }
 
   test('Point Test', () => {
     const assert = createAssert();
@@ -150,12 +171,12 @@ describe('BoundingBoxComputation', () => {
   });
 
   quadraticParams.forEach((params, index) => {
-    test(`Quadratic Test ${index}`, () => {
+    runTest(`Quadratic Test ${index}`, (options: TestOptions, contextBuilder: ContextBuilder) => {
       const assert = createAssert();
       const points = params.points;
       const box = params.box;
 
-      const ctx = createContext(points);
+      const ctx = createContext(options.backend, options.elementId, points);
       const [x0, y0, x1, y1, x2, y2] = points;
 
       // Draw expected bounding box.
@@ -203,12 +224,12 @@ describe('BoundingBoxComputation', () => {
   });
 
   cubicParams.forEach((params, index) => {
-    test(`Cubic Test ${index}`, () => {
+    runTest(`Cubic Test ${index}`, (options: TestOptions, contextBuilder: ContextBuilder) => {
       const assert = createAssert();
       const points = params.points;
       const box = params.box;
 
-      const ctx = createContext(points);
+      const ctx = createContext(options.backend, options.elementId, points);
       const [x0, y0, x1, y1, x2, y2, x3, y3] = points;
 
       // Draw expected bounding box.

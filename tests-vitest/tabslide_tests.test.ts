@@ -3,77 +3,92 @@
 //
 // TabSlide Tests - Vitest Version
 
-import { afterAll, beforeAll, describe, test } from 'vitest';
+import { describe, test } from 'vitest';
 
 import { Flow } from '../src/flow';
 import { Formatter } from '../src/formatter';
 import { RenderContext } from '../src/rendercontext';
-import { Renderer } from '../src/renderer';
+import { ContextBuilder, Renderer } from '../src/renderer';
 import { TieNotes } from '../src/stavetie';
 import { TabNote, TabNoteStruct } from '../src/tabnote';
 import { TabSlide } from '../src/tabslide';
 import { TabStave } from '../src/tabstave';
 import { Voice } from '../src/voice';
-import { createAssert, FONT_STACKS } from './vitest_test_helpers';
-
-function createTestElement() {
-  const elementId = 'test_' + Date.now() + '_' + Math.random();
-  const element = document.createElement('canvas');
-  element.id = elementId;
-  document.body.appendChild(element);
-  return elementId;
-}
-
-function tieNotes(notes: TabNote[], indices: number[], stave: TabStave, ctx: RenderContext): void {
-  const voice = new Voice(Flow.TIME4_4);
-  voice.addTickables(notes);
-
-  new Formatter().joinVoices([voice]).format([voice], 100);
-  voice.draw(ctx, stave);
-
-  const tie = new TabSlide(
-    {
-      first_note: notes[0],
-      last_note: notes[1],
-      first_indices: indices,
-      last_indices: indices,
-    },
-    TabSlide.SLIDE_UP
-  );
-
-  tie.setContext(ctx);
-  tie.draw();
-}
-
-function setupContext(width?: number): { context: RenderContext; stave: TabStave } {
-  const elementId = createTestElement();
-  const context = Renderer.getCanvasContext(elementId, 350, 140);
-  context.scale(0.9, 0.9);
-
-  context.font = '10pt Arial';
-  const stave = new TabStave(10, 10, width || 350).addTabGlyph().setContext(context).draw();
-
-  return { context, stave };
-}
+import { createAssert, FONT_STACKS, generateTestID, TestOptions } from './vitest_test_helpers';
 
 // Helper function to create TabNote objects.
 const tabNote = (noteStruct: TabNoteStruct) => new TabNote(noteStruct);
 
 describe('TabSlide', () => {
-  let originalFontNames: string[];
+  // Helper function to run a test with multiple backends and font stacks
+  function runTest(
+    testName: string,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    backends: Array<{ backend: number; fontStacks: string[] }> = [
+      { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
+      { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
+    ]
+  ) {
+    backends.forEach(({ backend, fontStacks }) => {
+      fontStacks.forEach((fontStackName) => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+          const elementId = generateTestID('tabslide_test');
 
-  beforeAll(async () => {
-    originalFontNames = Flow.getMusicFont();
-    Flow.setMusicFont(...FONT_STACKS['Bravura']);
-  });
+          // Create the DOM element before the test runs
+          const tagName = backend === Renderer.Backends.SVG ? 'div' : 'canvas';
+          const element = document.createElement(tagName);
+          element.id = elementId;
+          document.body.appendChild(element);
 
-  afterAll(() => {
-    Flow.setMusicFont(...originalFontNames);
-  });
+          const assert = createAssert();
+          const options: TestOptions = { elementId, params: {}, backend };
 
-  test('Simple TabSlide', () => {
+          // Set font stack
+          const originalFontNames = Flow.getMusicFont();
+          Flow.setMusicFont(...FONT_STACKS[fontStackName]);
+
+          try {
+            const contextBuilder: ContextBuilder =
+              backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
+            testFunc(options, contextBuilder);
+          } finally {
+            // Restore original font
+            Flow.setMusicFont(...originalFontNames);
+            // Don't remove the element so we can see rendered output
+            // element.remove();
+          }
+        });
+      });
+    });
+  }
+
+  function tieNotes(notes: TabNote[], indices: number[], stave: TabStave, ctx: RenderContext): void {
+    const voice = new Voice(Flow.TIME4_4);
+    voice.addTickables(notes);
+
+    new Formatter().joinVoices([voice]).format([voice], 100);
+    voice.draw(ctx, stave);
+
+    const tie = new TabSlide(
+      {
+        first_note: notes[0],
+        last_note: notes[1],
+        first_indices: indices,
+        last_indices: indices,
+      },
+      TabSlide.SLIDE_UP
+    );
+
+    tie.setContext(ctx);
+    tie.draw();
+  }
+
+  runTest('Simple TabSlide', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const { stave, context } = setupContext();
+    const context = contextBuilder(options.elementId, 350, 140);
+    context.scale(0.9, 0.9);
+    context.font = '10pt Arial';
+    const stave = new TabStave(10, 10, 350).addTabGlyph().setContext(context).draw();
 
     tieNotes(
       [
@@ -90,10 +105,13 @@ describe('TabSlide', () => {
   /**
    * The slideUp and slideDown tests use a builder function: TabSlide.createSlideUp | TabSlide.createSlideDown.
    */
-  function multiTest(buildTabSlide: (notes: TieNotes) => TabSlide) {
-    return () => {
+  function multiTest(testName: string, buildTabSlide: (notes: TieNotes) => TabSlide) {
+    runTest(testName, (options: TestOptions, contextBuilder: ContextBuilder) => {
       const assert = createAssert();
-      const { context, stave } = setupContext(440);
+      const context = contextBuilder(options.elementId, 440, 140);
+      context.scale(0.9, 0.9);
+      context.font = '10pt Arial';
+      const stave = new TabStave(10, 10, 440).addTabGlyph().setContext(context).draw();
 
       const notes = [
         tabNote({ positions: [{ str: 4, fret: 4 }], duration: '8' }),
@@ -177,9 +195,9 @@ describe('TabSlide', () => {
         .draw();
 
       assert.ok(true, 'Chord high-fret');
-    };
+    });
   }
 
-  test('Slide Up', multiTest(TabSlide.createSlideUp));
-  test('Slide Down', multiTest(TabSlide.createSlideDown));
+  multiTest('Slide Up', TabSlide.createSlideUp);
+  multiTest('Slide Down', TabSlide.createSlideDown);
 });
