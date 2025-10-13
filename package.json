@@ -138,9 +138,10 @@
   "scripts": {
     "start": "grunt",
     "test": "grunt test",
-    "test:vitest": "vitest run",
-    "test:vitest:ui": "vitest --ui",
-    "test:vitest:watch": "vitest",
+    "test:vitest": "vitest --config vitest.config.dev.ts",
+    "test:vitest:ci": "vitest run --config vitest.config.ci.ts",
+    "test:vitest:ui": "vitest --ui --config vitest.config.dev.ts",
+    "test:vitest:watch": "vitest --config vitest.config.dev.ts",
     "reference": "grunt reference",
     "test:reference": "grunt test:reference",
     "test:reference:cache": "grunt test:reference:cache",
