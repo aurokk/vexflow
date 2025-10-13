@@ -24,6 +24,10 @@ import { TimeSigNote } from '../src/timesignote';
 import { isAccidental } from '../src/typeguard';
 import { Voice } from '../src/voice';
 import { createAssert, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
+import { page } from '@vitest/browser/context';
+import { server } from '@vitest/browser/context';
+
+const { readFile, writeFile, removeFile } = server.commands;
 
 // Check that at least one of the note's modifiers is an Accidental.
 function hasAccidental(note: StaveNote) {
@@ -37,9 +41,9 @@ function makeNewAccid(factory: Factory) {
 
 describe('Accidental', () => {
   // Helper function to run a test with multiple backends and font stacks
-  function runTest(
+  async function runTest(
     testName: string,
-    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void | Promise<void>,
     backends: Array<{ backend: number; fontStacks: string[] }> = [
       { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
       { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
@@ -47,13 +51,14 @@ describe('Accidental', () => {
   ) {
     backends.forEach(({ backend, fontStacks }) => {
       fontStacks.forEach((fontStackName) => {
-        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, async () => {
           const elementId = generateTestID('accidental_test');
 
           // Create the DOM element before the test runs
           const tagName = backend === Renderer.Backends.SVG ? 'div' : 'canvas';
           const element = document.createElement(tagName);
           element.id = elementId;
+          element.dataset.testid = 'canvas';
           document.body.appendChild(element);
 
           const options: TestOptions = { elementId, params: {}, backend };
@@ -65,7 +70,19 @@ describe('Accidental', () => {
           try {
             const contextBuilder: ContextBuilder =
               backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
-            testFunc(options, contextBuilder);
+            await testFunc(options, contextBuilder);
+
+            if (backend === Renderer.Backends.CANVAS) {
+              const canvas = document.getElementById(elementId) as HTMLCanvasElement;
+              const dataurl = canvas.toDataURL('image/png');
+              await writeFile(
+                `tests-vitest/__screenshots__/accidental_tests.test.ts/${testName} - Canvas - ${fontStackName}.png`,
+                dataurl.split(',')[1],
+                {
+                  encoding: 'base64url',
+                }
+              );
+            }
           } finally {
             // Restore original font
             Flow.setMusicFont(...originalFontNames);
