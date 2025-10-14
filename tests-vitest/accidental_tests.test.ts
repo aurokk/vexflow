@@ -3,7 +3,11 @@
 //
 // Accidental Tests - Vitest Version
 
+import { page, server } from '@vitest/browser/context';
+import pixelmatch from 'pixelmatch';
+import { PNG } from 'pngjs/browser';
 import { describe, expect, test } from 'vitest';
+import * as UPNG from 'upng-js';
 
 import { Accidental } from '../src/accidental';
 import { Beam } from '../src/beam';
@@ -24,8 +28,6 @@ import { TimeSigNote } from '../src/timesignote';
 import { isAccidental } from '../src/typeguard';
 import { Voice } from '../src/voice';
 import { createAssert, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
-import { page } from '@vitest/browser/context';
-import { server } from '@vitest/browser/context';
 
 const { readFile, writeFile, removeFile } = server.commands;
 
@@ -71,18 +73,6 @@ describe('Accidental', () => {
             const contextBuilder: ContextBuilder =
               backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
             await testFunc(options, contextBuilder);
-
-            if (backend === Renderer.Backends.CANVAS) {
-              const canvas = document.getElementById(elementId) as HTMLCanvasElement;
-              const dataurl = canvas.toDataURL('image/png');
-              await writeFile(
-                `tests-vitest/__screenshots__/accidental_tests.test.ts/${testName} - Canvas - ${fontStackName}.png`,
-                dataurl.split(',')[1],
-                {
-                  encoding: 'base64url',
-                }
-              );
-            }
           } finally {
             // Restore original font
             Flow.setMusicFont(...originalFontNames);
@@ -360,7 +350,7 @@ describe('Accidental', () => {
     assert.ok(true, 'Must successfully render cautionary accidentals');
   });
 
-  runTest('Accidental Arrangement Special Cases', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Accidental Arrangement Special Cases', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const f = makeFactory(options.backend, options.elementId, 700, 240);
     const accid = makeNewAccid(f);
@@ -417,7 +407,108 @@ describe('Accidental', () => {
 
     f.draw();
 
-    assert.ok(true, 'Full Accidental');
+    function base64ToUint8Array(base64: string) {
+      const binary = atob(base64);
+      const len = binary.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) bytes[i] = binary.charCodeAt(i);
+      return bytes;
+    }
+
+    function base64ToUint8ArrayCl(base64: string) {
+      const binary = atob(base64);
+      const len = binary.length;
+      const buffer = new ArrayBuffer(len);
+      const bytes = new Uint8ClampedArray<ArrayBuffer>(buffer);
+      for (let i = 0; i < len; i++) bytes[i] = binary.charCodeAt(i);
+      return bytes;
+    }
+
+    function arrayBufferToBase64(buffer: ArrayBuffer) {
+      let binary = '';
+      const bytes = new Uint8Array(buffer);
+      const len = bytes.byteLength;
+      for (let i = 0; i < len; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      return btoa(binary);
+    }
+
+    function abToBase64(buffer: Uint8ClampedArray<ArrayBuffer>) {
+      let binary = '';
+      const bytes = new Uint8Array(buffer);
+      const len = bytes.byteLength;
+      for (let i = 0; i < len; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      return btoa(binary);
+    }
+
+    // if (backend === Renderer.Backends.CANVAS) {
+    //   const canvas = document.getElementById(elementId) as HTMLCanvasElement;
+    //   const dataurl = canvas.toDataURL('image/png');
+    //   await writeFile(
+    //     `tests-vitest/__screenshots__/accidental_tests.test.ts/${testName} - Canvas - ${fontStackName}.png`,
+    //     dataurl.split(',')[1],
+    //     {
+    //       encoding: 'base64url',
+    //     }
+    //   );
+    // }
+    function buf2hex(buffer: ArrayBuffer) {
+      // buffer is an ArrayBuffer
+      return [...new Uint8Array(buffer)].map((x) => x.toString(16).padStart(2, '0')).join('');
+    }
+
+    function hex2buf(hex: string): ArrayBuffer {
+      const bytes = new Uint8Array(hex.length / 2);
+      for (let i = 0; i < hex.length; i += 2) {
+        bytes[i / 2] = parseInt(hex.substring(i, i + 2), 16);
+      }
+      return bytes.buffer;
+    }
+
+    if (options.backend === Renderer.Backends.CANVAS) {
+      const filepath = `tests-vitest/__screenshots__/accidental_tests.test.ts/x.png`;
+      const newcanvas = document.getElementById(options.elementId) as HTMLCanvasElement;
+      const scale = 2;
+      const width = 700 * scale;
+      const height = 240 * scale;
+      const newdata = newcanvas.getContext('2d')!.getImageData(0, 0, width, height).data;
+      console.log('newdata', newdata.length);
+      const newpng = UPNG.encode([newdata.buffer], width, height, 0);
+      console.log('newpng', newpng.byteLength);
+
+      let oldpng: ArrayBuffer | null = null;
+      try {
+        const oldhex = await readFile(filepath, { encoding: 'hex' });
+        oldpng = hex2buf(oldhex);
+      } catch {
+        //
+      }
+      if (!oldpng) {
+        const newhex = buf2hex(newpng);
+        console.log('newhex', newhex.length);
+        await writeFile(filepath, newhex, { encoding: 'hex' });
+        const oldhex = await readFile(filepath, { encoding: 'hex' });
+        console.log('oldhex', oldhex.length);
+        oldpng = hex2buf(oldhex);
+        console.log('oldpng', oldpng.byteLength);
+      }
+
+      const oldDecoded = UPNG.decode(oldpng);
+      const newDecoded = UPNG.decode(newpng);
+
+      const diff = pixelmatch(
+        new Uint8Array(UPNG.toRGBA8(oldDecoded)[0]),
+        new Uint8Array(UPNG.toRGBA8(newDecoded)[0]),
+        new Uint8Array(width * height * 4),
+        width,
+        height
+      );
+
+      expect((diff * 100) / (width * height * 4)).to.be.lessThanOrEqual(1);
+    }
   });
 
   runTest('Stem Down', (options: TestOptions, contextBuilder: ContextBuilder) => {
