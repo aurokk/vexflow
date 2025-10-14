@@ -407,56 +407,7 @@ describe('Accidental', () => {
 
     f.draw();
 
-    function base64ToUint8Array(base64: string) {
-      const binary = atob(base64);
-      const len = binary.length;
-      const bytes = new Uint8Array(len);
-      for (let i = 0; i < len; i++) bytes[i] = binary.charCodeAt(i);
-      return bytes;
-    }
-
-    function base64ToUint8ArrayCl(base64: string) {
-      const binary = atob(base64);
-      const len = binary.length;
-      const buffer = new ArrayBuffer(len);
-      const bytes = new Uint8ClampedArray<ArrayBuffer>(buffer);
-      for (let i = 0; i < len; i++) bytes[i] = binary.charCodeAt(i);
-      return bytes;
-    }
-
-    function arrayBufferToBase64(buffer: ArrayBuffer) {
-      let binary = '';
-      const bytes = new Uint8Array(buffer);
-      const len = bytes.byteLength;
-      for (let i = 0; i < len; i++) {
-        binary += String.fromCharCode(bytes[i]);
-      }
-      return btoa(binary);
-    }
-
-    function abToBase64(buffer: Uint8ClampedArray<ArrayBuffer>) {
-      let binary = '';
-      const bytes = new Uint8Array(buffer);
-      const len = bytes.byteLength;
-      for (let i = 0; i < len; i++) {
-        binary += String.fromCharCode(bytes[i]);
-      }
-      return btoa(binary);
-    }
-
-    // if (backend === Renderer.Backends.CANVAS) {
-    //   const canvas = document.getElementById(elementId) as HTMLCanvasElement;
-    //   const dataurl = canvas.toDataURL('image/png');
-    //   await writeFile(
-    //     `tests-vitest/__screenshots__/accidental_tests.test.ts/${testName} - Canvas - ${fontStackName}.png`,
-    //     dataurl.split(',')[1],
-    //     {
-    //       encoding: 'base64url',
-    //     }
-    //   );
-    // }
     function buf2hex(buffer: ArrayBuffer) {
-      // buffer is an ArrayBuffer
       return [...new Uint8Array(buffer)].map((x) => x.toString(16).padStart(2, '0')).join('');
     }
 
