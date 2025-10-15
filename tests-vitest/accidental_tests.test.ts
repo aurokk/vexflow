@@ -49,12 +49,7 @@ describe('Accidental', () => {
   // Helper function to run a test with multiple backends and font stacks
   async function runTest(
     testName: string,
-    testFunc: (
-      options: TestOptions,
-      contextBuilder: ContextBuilder,
-      testName: string,
-      fontStackName: string
-    ) => void | Promise<void>,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void | Promise<void>,
     backends: Array<{ backend: number; fontStacks: string[] }> = [
       { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
       { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
@@ -71,7 +66,13 @@ describe('Accidental', () => {
           element.id = elementId;
           document.body.appendChild(element);
 
-          const options: TestOptions = { elementId, params: {}, backend };
+          const options: TestOptions = {
+            elementId,
+            params: {},
+            backend,
+            testName,
+            fontStackName,
+          };
 
           // Set font stack
           const originalFontNames = Flow.getMusicFont();
@@ -80,7 +81,7 @@ describe('Accidental', () => {
           try {
             const contextBuilder: ContextBuilder =
               backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
-            await testFunc(options, contextBuilder, testName, fontStackName);
+            await testFunc(options, contextBuilder);
           } finally {
             // Restore original font
             Flow.setMusicFont(...originalFontNames);
@@ -358,99 +359,96 @@ describe('Accidental', () => {
     assert.ok(true, 'Must successfully render cautionary accidentals');
   });
 
-  runTest(
-    'Accidental Arrangement Special Cases',
-    async (options: TestOptions, contextBuilder: ContextBuilder, testName: string, fontStackName: string) => {
-      const assert = createAssert();
-      const f = makeFactory(options.backend, options.elementId, 700, 240);
-      const accid = makeNewAccid(f);
-      f.Stave({ x: 10, y: 10, width: 550 });
+  runTest('Accidental Arrangement Special Cases', async (options: TestOptions, contextBuilder: ContextBuilder) => {
+    const assert = createAssert();
+    const f = makeFactory(options.backend, options.elementId, 700, 240);
+    const accid = makeNewAccid(f);
+    f.Stave({ x: 10, y: 10, width: 550 });
 
-      const notes = [
-        f
-          .StaveNote({ keys: ['f/4', 'd/5'], duration: '1' })
-          .addModifier(accid('#'), 0)
-          .addModifier(accid('b'), 1),
+    const notes = [
+      f
+        .StaveNote({ keys: ['f/4', 'd/5'], duration: '1' })
+        .addModifier(accid('#'), 0)
+        .addModifier(accid('b'), 1),
 
-        f
-          .StaveNote({ keys: ['c/4', 'g/4'], duration: '2' })
-          .addModifier(accid('##'), 0)
-          .addModifier(accid('##'), 1),
+      f
+        .StaveNote({ keys: ['c/4', 'g/4'], duration: '2' })
+        .addModifier(accid('##'), 0)
+        .addModifier(accid('##'), 1),
 
-        f
-          .StaveNote({ keys: ['b/3', 'd/4', 'f/4'], duration: '16' })
-          .addModifier(accid('#'), 0)
-          .addModifier(accid('#'), 1)
-          .addModifier(accid('##'), 2),
+      f
+        .StaveNote({ keys: ['b/3', 'd/4', 'f/4'], duration: '16' })
+        .addModifier(accid('#'), 0)
+        .addModifier(accid('#'), 1)
+        .addModifier(accid('##'), 2),
 
-        f
-          .StaveNote({ keys: ['g/4', 'a/4', 'c/5', 'e/5'], duration: '16' })
-          .addModifier(accid('b'), 0)
-          .addModifier(accid('b'), 1)
-          .addModifier(accid('n'), 3),
+      f
+        .StaveNote({ keys: ['g/4', 'a/4', 'c/5', 'e/5'], duration: '16' })
+        .addModifier(accid('b'), 0)
+        .addModifier(accid('b'), 1)
+        .addModifier(accid('n'), 3),
 
-        f
-          .StaveNote({ keys: ['e/4', 'g/4', 'b/4', 'c/5'], duration: '4' })
-          .addModifier(accid('b').setAsCautionary(), 0)
-          .addModifier(accid('b').setAsCautionary(), 1)
-          .addModifier(accid('bb'), 2)
-          .addModifier(accid('b'), 3),
+      f
+        .StaveNote({ keys: ['e/4', 'g/4', 'b/4', 'c/5'], duration: '4' })
+        .addModifier(accid('b').setAsCautionary(), 0)
+        .addModifier(accid('b').setAsCautionary(), 1)
+        .addModifier(accid('bb'), 2)
+        .addModifier(accid('b'), 3),
 
-        f
-          .StaveNote({ keys: ['b/3', 'e/4', 'a/4', 'd/5', 'g/5'], duration: '8' })
-          .addModifier(accid('bb'), 0)
-          .addModifier(accid('b').setAsCautionary(), 1)
-          .addModifier(accid('n').setAsCautionary(), 2)
-          .addModifier(accid('#'), 3)
-          .addModifier(accid('n').setAsCautionary(), 4),
-      ];
+      f
+        .StaveNote({ keys: ['b/3', 'e/4', 'a/4', 'd/5', 'g/5'], duration: '8' })
+        .addModifier(accid('bb'), 0)
+        .addModifier(accid('b').setAsCautionary(), 1)
+        .addModifier(accid('n').setAsCautionary(), 2)
+        .addModifier(accid('#'), 3)
+        .addModifier(accid('n').setAsCautionary(), 4),
+    ];
 
-      Formatter.SimpleFormat(notes, 0, { paddingBetween: 20 });
+    Formatter.SimpleFormat(notes, 0, { paddingBetween: 20 });
 
-      notes.forEach((note, index) => {
-        Note.plotMetrics(f.getContext(), note, 140);
-        assert.ok(note.getModifiersByType('Accidental').length > 0, 'Note ' + index + ' has accidentals');
-        note.getModifiersByType('Accidental').forEach((accid, index) => {
-          assert.ok(accid.getWidth() > 0, 'Accidental ' + index + ' has set width');
-        });
+    notes.forEach((note, index) => {
+      Note.plotMetrics(f.getContext(), note, 140);
+      assert.ok(note.getModifiersByType('Accidental').length > 0, 'Note ' + index + ' has accidentals');
+      note.getModifiersByType('Accidental').forEach((accid, index) => {
+        assert.ok(accid.getWidth() > 0, 'Accidental ' + index + ' has set width');
       });
+    });
 
-      f.draw();
+    f.draw();
 
-      // Screenshot comparison for visual regression testing
-      // Using toMatchScreenshotWithinPercent(1) to allow up to 1% pixel difference
-      // You can adjust the threshold: toMatchScreenshotWithinPercent(0.5) for stricter 0.5%
-      // To update screenshots: npm run test:vitest:update (or vitest run -u)
-      if (options.backend === Renderer.Backends.CANVAS) {
-        const canvas = document.getElementById(options.elementId) as HTMLCanvasElement;
-        const width = canvas.width;
-        const height = canvas.height;
-        const backendName = 'Canvas';
-        const filepath = `tests-vitest/__screenshots__/accidental_tests.test.ts/${testName} - ${backendName} - ${fontStackName}.png`;
+    // Screenshot comparison for visual regression testing
+    // Using toMatchScreenshotWithinPercent(1) to allow up to 1% pixel difference
+    // You can adjust the threshold: toMatchScreenshotWithinPercent(0.5) for stricter 0.5%
+    // To update screenshots: npm run test:vitest:update (or vitest run -u)
+    if (options.backend === Renderer.Backends.CANVAS) {
+      const canvas = document.getElementById(options.elementId) as HTMLCanvasElement;
+      const width = canvas.width;
+      const height = canvas.height;
+      const backendName = 'Canvas';
+      const filepath = `tests-vitest/__screenshots__/accidental_tests.test.ts/${options.testName} - ${backendName} - ${options.fontStackName}.png`;
 
-        const newpng = captureCanvasScreenshot(canvas);
-        const oldpng = await readOrSaveScreenshot(newpng, { filepath, width, height });
-        const diffPercentage = compareScreenshots(oldpng, newpng, width, height);
+      const newpng = captureCanvasScreenshot(canvas);
+      const oldpng = await readOrSaveScreenshot(newpng, { filepath, width, height });
+      const diffPercentage = compareScreenshots(oldpng, newpng, width, height);
 
-        expect(diffPercentage).toMatchScreenshotWithinPercent(1);
-      }
-
-      if (options.backend === Renderer.Backends.SVG) {
-        const div = document.getElementById(options.elementId) as HTMLDivElement;
-        const scale = 2;
-        const width = 700 * scale;
-        const height = 240 * scale;
-        const backendName = 'SVG';
-        const filepath = `tests-vitest/__screenshots__/accidental_tests.test.ts/${testName} - ${backendName} - ${fontStackName}.png`;
-
-        const newpng = await captureSvgScreenshot(div.innerHTML, width, height);
-        const oldpng = await readOrSaveScreenshot(newpng, { filepath, width, height });
-        const diffPercentage = compareScreenshots(oldpng, newpng, width, height);
-
-        expect(diffPercentage).toMatchScreenshotWithinPercent(1);
-      }
+      expect(diffPercentage).toMatchScreenshotWithinPercent(1);
     }
-  );
+
+    if (options.backend === Renderer.Backends.SVG) {
+      const div = document.getElementById(options.elementId) as HTMLDivElement;
+      const scale = 2;
+      const width = 700 * scale;
+      const height = 240 * scale;
+      const backendName = 'SVG';
+      const filepath = `tests-vitest/__screenshots__/accidental_tests.test.ts/${options.testName} - ${backendName} - ${options.fontStackName}.png`;
+
+      const newpng = await captureSvgScreenshot(div.innerHTML, width, height);
+      const oldpng = await readOrSaveScreenshot(newpng, { filepath, width, height });
+      const diffPercentage = compareScreenshots(oldpng, newpng, width, height);
+
+      expect(diffPercentage).toMatchScreenshotWithinPercent(1);
+    }
+  });
 
   runTest('Stem Down', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();

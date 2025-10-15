@@ -151,7 +151,7 @@
     "test:vitest:ci": "vitest run --config vitest.config.ci.ts",
     "test:vitest:ui": "vitest --ui --config vitest.config.dev.ts",
     "test:vitest:watch": "vitest --config vitest.config.dev.ts",
-    "test:vitest:update": "vitest run --config vitest.config.dev.ts -u",
+    "test:vitest:clean": "rm -rf tests-vitest/__screenshots__",
     "reference": "grunt reference",
     "test:reference": "grunt test:reference",
     "test:reference:cache": "grunt test:reference:cache",

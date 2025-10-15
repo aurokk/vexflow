@@ -17,6 +17,8 @@ export interface TestOptions {
   params: any;
   backend: number;
   contextBuilder?: ContextBuilder;
+  testName?: string;
+  fontStackName?: string;
 }
 
 // Vitest assert object that mimics QUnit's assert
@@ -207,45 +209,23 @@ export interface ScreenshotOptions {
   height: number;
 }
 
-// Track if we've shown the update mode message
-let updateModeMessageShown = false;
-
 /**
  * Reads or saves a screenshot PNG file.
  *
  * Behavior:
  * - If the file doesn't exist, it saves the new screenshot and returns it
  * - If the file exists, it returns the existing screenshot for comparison
- * - If update mode is enabled (vitest -u or --update), it overwrites existing screenshots
  *
  * Usage:
- * - Normal mode: `npm run test:vitest`
- * - Update screenshots: `npm run test:vitest -- -u`
+ * - Normal mode: `npm run test:vitest` or `npm run test:vitest:ci` - compares against existing screenshots
+ * - To update all screenshots: `npm run test:vitest:update` - deletes old screenshots and generates new ones
  */
 export async function readOrSaveScreenshot(newpng: ArrayBuffer, options: ScreenshotOptions): Promise<ArrayBuffer> {
   const { filepath } = options;
 
-  // Check if we're in update mode (vitest -u or --update)
-  const isUpdateMode = process.argv.includes('-u') || process.argv.includes('--update');
-
-  // Show update mode message once
-  if (isUpdateMode && !updateModeMessageShown) {
-    console.log('📸 Screenshot update mode enabled - updating all screenshots');
-    updateModeMessageShown = true;
-  }
-
   let oldpng: ArrayBuffer | null = null;
 
-  // If update mode is enabled, always save the new screenshot
-  if (isUpdateMode) {
-    const newhex = buf2hex(newpng);
-    await writeFile(filepath, newhex, { encoding: 'hex' });
-    const oldhex = await readFile(filepath, { encoding: 'hex' });
-    oldpng = hex2buf(oldhex);
-    return oldpng;
-  }
-
-  // Normal mode: read existing or save if it doesn't exist
+  // Try to read existing screenshot
   try {
     const oldhex = await readFile(filepath, { encoding: 'hex' });
     oldpng = hex2buf(oldhex);
@@ -253,6 +233,7 @@ export async function readOrSaveScreenshot(newpng: ArrayBuffer, options: Screens
     // File doesn't exist, will create it below
   }
 
+  // If no existing screenshot, save the new one
   if (!oldpng) {
     const newhex = buf2hex(newpng);
     await writeFile(filepath, newhex, { encoding: 'hex' });
