@@ -419,8 +419,8 @@ describe('Accidental', () => {
 
       // Screenshot comparison for visual regression testing
       // Using toMatchScreenshotWithinPercent(1) to allow up to 1% pixel difference
-      // You can adjust the threshold: toMatchScreenshotWithinPercent(0.5) for stricter 0.5%, or use
-      // the convenience wrapper: toMatchScreenshotWithinOnePercent() for the default 1% threshold
+      // You can adjust the threshold: toMatchScreenshotWithinPercent(0.5) for stricter 0.5%
+      // To update screenshots: npm run test:vitest:update (or vitest run -u)
       if (options.backend === Renderer.Backends.CANVAS) {
         const canvas = document.getElementById(options.elementId) as HTMLCanvasElement;
         const width = canvas.width;

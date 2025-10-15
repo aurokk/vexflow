@@ -207,20 +207,50 @@ export interface ScreenshotOptions {
   height: number;
 }
 
+// Track if we've shown the update mode message
+let updateModeMessageShown = false;
+
 /**
  * Reads or saves a screenshot PNG file.
- * If the file doesn't exist, it saves the new screenshot and returns it.
- * If the file exists, it returns the existing screenshot.
+ *
+ * Behavior:
+ * - If the file doesn't exist, it saves the new screenshot and returns it
+ * - If the file exists, it returns the existing screenshot for comparison
+ * - If update mode is enabled (vitest -u or --update), it overwrites existing screenshots
+ *
+ * Usage:
+ * - Normal mode: `npm run test:vitest`
+ * - Update screenshots: `npm run test:vitest -- -u`
  */
 export async function readOrSaveScreenshot(newpng: ArrayBuffer, options: ScreenshotOptions): Promise<ArrayBuffer> {
   const { filepath } = options;
 
+  // Check if we're in update mode (vitest -u or --update)
+  const isUpdateMode = process.argv.includes('-u') || process.argv.includes('--update');
+
+  // Show update mode message once
+  if (isUpdateMode && !updateModeMessageShown) {
+    console.log('📸 Screenshot update mode enabled - updating all screenshots');
+    updateModeMessageShown = true;
+  }
+
   let oldpng: ArrayBuffer | null = null;
+
+  // If update mode is enabled, always save the new screenshot
+  if (isUpdateMode) {
+    const newhex = buf2hex(newpng);
+    await writeFile(filepath, newhex, { encoding: 'hex' });
+    const oldhex = await readFile(filepath, { encoding: 'hex' });
+    oldpng = hex2buf(oldhex);
+    return oldpng;
+  }
+
+  // Normal mode: read existing or save if it doesn't exist
   try {
     const oldhex = await readFile(filepath, { encoding: 'hex' });
     oldpng = hex2buf(oldhex);
   } catch {
-    // File doesn't exist
+    // File doesn't exist, will create it below
   }
 
   if (!oldpng) {
