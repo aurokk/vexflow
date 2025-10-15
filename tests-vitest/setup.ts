@@ -70,13 +70,6 @@ beforeEach(() => {
     };
   }
 
-  // Create a container for test output (equivalent to #qunit-tests)
-  if (!document.getElementById('vexflow-tests')) {
-    const container = document.createElement('div');
-    container.id = 'vexflow-tests';
-    document.body.appendChild(container);
-  }
-
   // Add basic styling to make rendered output visible
   if (!document.getElementById('vitest-vexflow-styles')) {
     const style = document.createElement('style');

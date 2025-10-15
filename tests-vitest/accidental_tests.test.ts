@@ -4,6 +4,7 @@
 // Accidental Tests - Vitest Version
 
 import { server } from '@vitest/browser/context';
+import { Canvg } from 'canvg';
 import pixelmatch from 'pixelmatch';
 import * as UPNG from 'upng-js';
 import { describe, expect, test } from 'vitest';
@@ -64,7 +65,6 @@ describe('Accidental', () => {
           const tagName = backend === Renderer.Backends.SVG ? 'div' : 'canvas';
           const element = document.createElement(tagName);
           element.id = elementId;
-          element.dataset.testid = 'canvas';
           document.body.appendChild(element);
 
           const options: TestOptions = { elementId, params: {}, backend };
@@ -433,6 +433,52 @@ describe('Accidental', () => {
         const filepath = `tests-vitest/__screenshots__/accidental_tests.test.ts/${testName} - ${backendName} - ${fontStackName}.png`;
 
         const newdata = newcanvas.getContext('2d')!.getImageData(0, 0, width, height).data;
+        const newpng = UPNG.encode([newdata.buffer], width, height, 0);
+
+        let oldpng: ArrayBuffer | null = null;
+        try {
+          const oldhex = await readFile(filepath, { encoding: 'hex' });
+          oldpng = hex2buf(oldhex);
+        } catch {
+          //
+        }
+        if (!oldpng) {
+          const newhex = buf2hex(newpng);
+          await writeFile(filepath, newhex, { encoding: 'hex' });
+          const oldhex = await readFile(filepath, { encoding: 'hex' });
+          oldpng = hex2buf(oldhex);
+        }
+
+        const oldDecoded = UPNG.decode(oldpng);
+        const newDecoded = UPNG.decode(newpng);
+
+        const diff = pixelmatch(
+          new Uint8Array(UPNG.toRGBA8(oldDecoded)[0]),
+          new Uint8Array(UPNG.toRGBA8(newDecoded)[0]),
+          new Uint8Array(width * height * 4),
+          width,
+          height
+        );
+
+        expect((diff * 100) / (width * height * 4)).to.be.lessThanOrEqual(1);
+      }
+
+      if (options.backend === Renderer.Backends.SVG) {
+        const div = document.getElementById(options.elementId) as HTMLDivElement;
+        const scale = 2;
+        const width = 700 * scale;
+        const height = 240 * scale;
+        const newsvg = div.innerHTML;
+        const backendName = 'SVG';
+        const filepath = `tests-vitest/__screenshots__/accidental_tests.test.ts/${testName} - ${backendName} - ${fontStackName}.png`;
+
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d')!;
+        const newcancas = Canvg.fromString(context, newsvg);
+        newcancas.resize(width, height, true);
+        await newcancas.render();
+
+        const newdata = context.getImageData(0, 0, width, height).data;
         const newpng = UPNG.encode([newdata.buffer], width, height, 0);
 
         let oldpng: ArrayBuffer | null = null;
