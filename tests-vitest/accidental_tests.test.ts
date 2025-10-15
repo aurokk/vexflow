@@ -3,11 +3,10 @@
 //
 // Accidental Tests - Vitest Version
 
-import { page, server } from '@vitest/browser/context';
+import { server } from '@vitest/browser/context';
 import pixelmatch from 'pixelmatch';
-import { PNG } from 'pngjs/browser';
-import { describe, expect, test } from 'vitest';
 import * as UPNG from 'upng-js';
+import { describe, expect, test } from 'vitest';
 
 import { Accidental } from '../src/accidental';
 import { Beam } from '../src/beam';
@@ -45,7 +44,12 @@ describe('Accidental', () => {
   // Helper function to run a test with multiple backends and font stacks
   async function runTest(
     testName: string,
-    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void | Promise<void>,
+    testFunc: (
+      options: TestOptions,
+      contextBuilder: ContextBuilder,
+      testName: string,
+      fontStackName: string
+    ) => void | Promise<void>,
     backends: Array<{ backend: number; fontStacks: string[] }> = [
       { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
       { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
@@ -72,7 +76,7 @@ describe('Accidental', () => {
           try {
             const contextBuilder: ContextBuilder =
               backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
-            await testFunc(options, contextBuilder);
+            await testFunc(options, contextBuilder, testName, fontStackName);
           } finally {
             // Restore original font
             Flow.setMusicFont(...originalFontNames);
@@ -350,117 +354,116 @@ describe('Accidental', () => {
     assert.ok(true, 'Must successfully render cautionary accidentals');
   });
 
-  runTest('Accidental Arrangement Special Cases', async (options: TestOptions, contextBuilder: ContextBuilder) => {
-    const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 700, 240);
-    const accid = makeNewAccid(f);
-    f.Stave({ x: 10, y: 10, width: 550 });
+  runTest(
+    'Accidental Arrangement Special Cases',
+    async (options: TestOptions, contextBuilder: ContextBuilder, testName: string, fontStackName: string) => {
+      const assert = createAssert();
+      const f = makeFactory(options.backend, options.elementId, 700, 240);
+      const accid = makeNewAccid(f);
+      f.Stave({ x: 10, y: 10, width: 550 });
 
-    const notes = [
-      f
-        .StaveNote({ keys: ['f/4', 'd/5'], duration: '1' })
-        .addModifier(accid('#'), 0)
-        .addModifier(accid('b'), 1),
+      const notes = [
+        f
+          .StaveNote({ keys: ['f/4', 'd/5'], duration: '1' })
+          .addModifier(accid('#'), 0)
+          .addModifier(accid('b'), 1),
 
-      f
-        .StaveNote({ keys: ['c/4', 'g/4'], duration: '2' })
-        .addModifier(accid('##'), 0)
-        .addModifier(accid('##'), 1),
+        f
+          .StaveNote({ keys: ['c/4', 'g/4'], duration: '2' })
+          .addModifier(accid('##'), 0)
+          .addModifier(accid('##'), 1),
 
-      f
-        .StaveNote({ keys: ['b/3', 'd/4', 'f/4'], duration: '16' })
-        .addModifier(accid('#'), 0)
-        .addModifier(accid('#'), 1)
-        .addModifier(accid('##'), 2),
+        f
+          .StaveNote({ keys: ['b/3', 'd/4', 'f/4'], duration: '16' })
+          .addModifier(accid('#'), 0)
+          .addModifier(accid('#'), 1)
+          .addModifier(accid('##'), 2),
 
-      f
-        .StaveNote({ keys: ['g/4', 'a/4', 'c/5', 'e/5'], duration: '16' })
-        .addModifier(accid('b'), 0)
-        .addModifier(accid('b'), 1)
-        .addModifier(accid('n'), 3),
+        f
+          .StaveNote({ keys: ['g/4', 'a/4', 'c/5', 'e/5'], duration: '16' })
+          .addModifier(accid('b'), 0)
+          .addModifier(accid('b'), 1)
+          .addModifier(accid('n'), 3),
 
-      f
-        .StaveNote({ keys: ['e/4', 'g/4', 'b/4', 'c/5'], duration: '4' })
-        .addModifier(accid('b').setAsCautionary(), 0)
-        .addModifier(accid('b').setAsCautionary(), 1)
-        .addModifier(accid('bb'), 2)
-        .addModifier(accid('b'), 3),
+        f
+          .StaveNote({ keys: ['e/4', 'g/4', 'b/4', 'c/5'], duration: '4' })
+          .addModifier(accid('b').setAsCautionary(), 0)
+          .addModifier(accid('b').setAsCautionary(), 1)
+          .addModifier(accid('bb'), 2)
+          .addModifier(accid('b'), 3),
 
-      f
-        .StaveNote({ keys: ['b/3', 'e/4', 'a/4', 'd/5', 'g/5'], duration: '8' })
-        .addModifier(accid('bb'), 0)
-        .addModifier(accid('b').setAsCautionary(), 1)
-        .addModifier(accid('n').setAsCautionary(), 2)
-        .addModifier(accid('#'), 3)
-        .addModifier(accid('n').setAsCautionary(), 4),
-    ];
+        f
+          .StaveNote({ keys: ['b/3', 'e/4', 'a/4', 'd/5', 'g/5'], duration: '8' })
+          .addModifier(accid('bb'), 0)
+          .addModifier(accid('b').setAsCautionary(), 1)
+          .addModifier(accid('n').setAsCautionary(), 2)
+          .addModifier(accid('#'), 3)
+          .addModifier(accid('n').setAsCautionary(), 4),
+      ];
 
-    Formatter.SimpleFormat(notes, 0, { paddingBetween: 20 });
+      Formatter.SimpleFormat(notes, 0, { paddingBetween: 20 });
 
-    notes.forEach((note, index) => {
-      Note.plotMetrics(f.getContext(), note, 140);
-      assert.ok(note.getModifiersByType('Accidental').length > 0, 'Note ' + index + ' has accidentals');
-      note.getModifiersByType('Accidental').forEach((accid, index) => {
-        assert.ok(accid.getWidth() > 0, 'Accidental ' + index + ' has set width');
+      notes.forEach((note, index) => {
+        Note.plotMetrics(f.getContext(), note, 140);
+        assert.ok(note.getModifiersByType('Accidental').length > 0, 'Note ' + index + ' has accidentals');
+        note.getModifiersByType('Accidental').forEach((accid, index) => {
+          assert.ok(accid.getWidth() > 0, 'Accidental ' + index + ' has set width');
+        });
       });
-    });
 
-    f.draw();
+      f.draw();
 
-    function buf2hex(buffer: ArrayBuffer) {
-      return [...new Uint8Array(buffer)].map((x) => x.toString(16).padStart(2, '0')).join('');
-    }
-
-    function hex2buf(hex: string): ArrayBuffer {
-      const bytes = new Uint8Array(hex.length / 2);
-      for (let i = 0; i < hex.length; i += 2) {
-        bytes[i / 2] = parseInt(hex.substring(i, i + 2), 16);
-      }
-      return bytes.buffer;
-    }
-
-    if (options.backend === Renderer.Backends.CANVAS) {
-      const filepath = `tests-vitest/__screenshots__/accidental_tests.test.ts/x.png`;
-      const newcanvas = document.getElementById(options.elementId) as HTMLCanvasElement;
-      const scale = 2;
-      const width = 700 * scale;
-      const height = 240 * scale;
-      const newdata = newcanvas.getContext('2d')!.getImageData(0, 0, width, height).data;
-      console.log('newdata', newdata.length);
-      const newpng = UPNG.encode([newdata.buffer], width, height, 0);
-      console.log('newpng', newpng.byteLength);
-
-      let oldpng: ArrayBuffer | null = null;
-      try {
-        const oldhex = await readFile(filepath, { encoding: 'hex' });
-        oldpng = hex2buf(oldhex);
-      } catch {
-        //
-      }
-      if (!oldpng) {
-        const newhex = buf2hex(newpng);
-        console.log('newhex', newhex.length);
-        await writeFile(filepath, newhex, { encoding: 'hex' });
-        const oldhex = await readFile(filepath, { encoding: 'hex' });
-        console.log('oldhex', oldhex.length);
-        oldpng = hex2buf(oldhex);
-        console.log('oldpng', oldpng.byteLength);
+      function buf2hex(buffer: ArrayBuffer) {
+        return [...new Uint8Array(buffer)].map((x) => x.toString(16).padStart(2, '0')).join('');
       }
 
-      const oldDecoded = UPNG.decode(oldpng);
-      const newDecoded = UPNG.decode(newpng);
+      function hex2buf(hex: string): ArrayBuffer {
+        const bytes = new Uint8Array(hex.length / 2);
+        for (let i = 0; i < hex.length; i += 2) {
+          bytes[i / 2] = parseInt(hex.substring(i, i + 2), 16);
+        }
+        return bytes.buffer;
+      }
 
-      const diff = pixelmatch(
-        new Uint8Array(UPNG.toRGBA8(oldDecoded)[0]),
-        new Uint8Array(UPNG.toRGBA8(newDecoded)[0]),
-        new Uint8Array(width * height * 4),
-        width,
-        height
-      );
+      if (options.backend === Renderer.Backends.CANVAS) {
+        const newcanvas = document.getElementById(options.elementId) as HTMLCanvasElement;
+        const width = newcanvas.width;
+        const height = newcanvas.height;
+        const backendName = 'Canvas';
+        const filepath = `tests-vitest/__screenshots__/accidental_tests.test.ts/${testName} - ${backendName} - ${fontStackName}.png`;
 
-      expect((diff * 100) / (width * height * 4)).to.be.lessThanOrEqual(1);
+        const newdata = newcanvas.getContext('2d')!.getImageData(0, 0, width, height).data;
+        const newpng = UPNG.encode([newdata.buffer], width, height, 0);
+
+        let oldpng: ArrayBuffer | null = null;
+        try {
+          const oldhex = await readFile(filepath, { encoding: 'hex' });
+          oldpng = hex2buf(oldhex);
+        } catch {
+          //
+        }
+        if (!oldpng) {
+          const newhex = buf2hex(newpng);
+          await writeFile(filepath, newhex, { encoding: 'hex' });
+          const oldhex = await readFile(filepath, { encoding: 'hex' });
+          oldpng = hex2buf(oldhex);
+        }
+
+        const oldDecoded = UPNG.decode(oldpng);
+        const newDecoded = UPNG.decode(newpng);
+
+        const diff = pixelmatch(
+          new Uint8Array(UPNG.toRGBA8(oldDecoded)[0]),
+          new Uint8Array(UPNG.toRGBA8(newDecoded)[0]),
+          new Uint8Array(width * height * 4),
+          width,
+          height
+        );
+
+        expect((diff * 100) / (width * height * 4)).to.be.lessThanOrEqual(1);
+      }
     }
-  });
+  );
 
   runTest('Stem Down', (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
