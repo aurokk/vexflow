@@ -3,10 +3,17 @@
 
 import { Vex } from '../src/index';
 
-import { beforeAll, beforeEach } from 'vitest';
+import { beforeAll, beforeEach, expect } from 'vitest';
 
 import { loadAllMusicFonts } from '../src/fonts/load_all';
 import { loadTextFonts } from '../src/fonts/textfonts';
+import { toMatchScreenshotWithinOnePercent, toMatchScreenshotWithinPercent } from './vitest_test_helpers';
+
+// Extend Vitest matchers with custom screenshot matchers
+expect.extend({
+  toMatchScreenshotWithinPercent,
+  toMatchScreenshotWithinOnePercent,
+});
 
 // Load VexFlow fonts before all tests
 beforeAll(() => {

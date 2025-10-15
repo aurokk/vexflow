@@ -3,10 +3,6 @@
 //
 // Accidental Tests - Vitest Version
 
-import { server } from '@vitest/browser/context';
-import { Canvg } from 'canvg';
-import pixelmatch from 'pixelmatch';
-import * as UPNG from 'upng-js';
 import { describe, expect, test } from 'vitest';
 
 import { Accidental } from '../src/accidental';
@@ -27,9 +23,17 @@ import { TickContext } from '../src/tickcontext';
 import { TimeSigNote } from '../src/timesignote';
 import { isAccidental } from '../src/typeguard';
 import { Voice } from '../src/voice';
-import { createAssert, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
-
-const { readFile, writeFile, removeFile } = server.commands;
+import {
+  captureCanvasScreenshot,
+  captureSvgScreenshot,
+  compareScreenshots,
+  createAssert,
+  FONT_STACKS,
+  generateTestID,
+  makeFactory,
+  readOrSaveScreenshot,
+  TestOptions,
+} from './vitest_test_helpers';
 
 // Check that at least one of the note's modifiers is an Accidental.
 function hasAccidental(note: StaveNote) {
@@ -413,54 +417,22 @@ describe('Accidental', () => {
 
       f.draw();
 
-      function buf2hex(buffer: ArrayBuffer) {
-        return [...new Uint8Array(buffer)].map((x) => x.toString(16).padStart(2, '0')).join('');
-      }
-
-      function hex2buf(hex: string): ArrayBuffer {
-        const bytes = new Uint8Array(hex.length / 2);
-        for (let i = 0; i < hex.length; i += 2) {
-          bytes[i / 2] = parseInt(hex.substring(i, i + 2), 16);
-        }
-        return bytes.buffer;
-      }
-
+      // Screenshot comparison for visual regression testing
+      // Using toMatchScreenshotWithinPercent(1) to allow up to 1% pixel difference
+      // You can adjust the threshold: toMatchScreenshotWithinPercent(0.5) for stricter 0.5%, or use
+      // the convenience wrapper: toMatchScreenshotWithinOnePercent() for the default 1% threshold
       if (options.backend === Renderer.Backends.CANVAS) {
-        const newcanvas = document.getElementById(options.elementId) as HTMLCanvasElement;
-        const width = newcanvas.width;
-        const height = newcanvas.height;
+        const canvas = document.getElementById(options.elementId) as HTMLCanvasElement;
+        const width = canvas.width;
+        const height = canvas.height;
         const backendName = 'Canvas';
         const filepath = `tests-vitest/__screenshots__/accidental_tests.test.ts/${testName} - ${backendName} - ${fontStackName}.png`;
 
-        const newdata = newcanvas.getContext('2d')!.getImageData(0, 0, width, height).data;
-        const newpng = UPNG.encode([newdata.buffer], width, height, 0);
+        const newpng = captureCanvasScreenshot(canvas);
+        const oldpng = await readOrSaveScreenshot(newpng, { filepath, width, height });
+        const diffPercentage = compareScreenshots(oldpng, newpng, width, height);
 
-        let oldpng: ArrayBuffer | null = null;
-        try {
-          const oldhex = await readFile(filepath, { encoding: 'hex' });
-          oldpng = hex2buf(oldhex);
-        } catch {
-          //
-        }
-        if (!oldpng) {
-          const newhex = buf2hex(newpng);
-          await writeFile(filepath, newhex, { encoding: 'hex' });
-          const oldhex = await readFile(filepath, { encoding: 'hex' });
-          oldpng = hex2buf(oldhex);
-        }
-
-        const oldDecoded = UPNG.decode(oldpng);
-        const newDecoded = UPNG.decode(newpng);
-
-        const diff = pixelmatch(
-          new Uint8Array(UPNG.toRGBA8(oldDecoded)[0]),
-          new Uint8Array(UPNG.toRGBA8(newDecoded)[0]),
-          new Uint8Array(width * height * 4),
-          width,
-          height
-        );
-
-        expect((diff * 100) / (width * height * 4)).to.be.lessThanOrEqual(1);
+        expect(diffPercentage).toMatchScreenshotWithinPercent(1);
       }
 
       if (options.backend === Renderer.Backends.SVG) {
@@ -468,45 +440,14 @@ describe('Accidental', () => {
         const scale = 2;
         const width = 700 * scale;
         const height = 240 * scale;
-        const newsvg = div.innerHTML;
         const backendName = 'SVG';
         const filepath = `tests-vitest/__screenshots__/accidental_tests.test.ts/${testName} - ${backendName} - ${fontStackName}.png`;
 
-        const canvas = document.createElement('canvas');
-        const context = canvas.getContext('2d')!;
-        const newcancas = Canvg.fromString(context, newsvg);
-        newcancas.resize(width, height, true);
-        await newcancas.render();
+        const newpng = await captureSvgScreenshot(div.innerHTML, width, height);
+        const oldpng = await readOrSaveScreenshot(newpng, { filepath, width, height });
+        const diffPercentage = compareScreenshots(oldpng, newpng, width, height);
 
-        const newdata = context.getImageData(0, 0, width, height).data;
-        const newpng = UPNG.encode([newdata.buffer], width, height, 0);
-
-        let oldpng: ArrayBuffer | null = null;
-        try {
-          const oldhex = await readFile(filepath, { encoding: 'hex' });
-          oldpng = hex2buf(oldhex);
-        } catch {
-          //
-        }
-        if (!oldpng) {
-          const newhex = buf2hex(newpng);
-          await writeFile(filepath, newhex, { encoding: 'hex' });
-          const oldhex = await readFile(filepath, { encoding: 'hex' });
-          oldpng = hex2buf(oldhex);
-        }
-
-        const oldDecoded = UPNG.decode(oldpng);
-        const newDecoded = UPNG.decode(newpng);
-
-        const diff = pixelmatch(
-          new Uint8Array(UPNG.toRGBA8(oldDecoded)[0]),
-          new Uint8Array(UPNG.toRGBA8(newDecoded)[0]),
-          new Uint8Array(width * height * 4),
-          width,
-          height
-        );
-
-        expect((diff * 100) / (width * height * 4)).to.be.lessThanOrEqual(1);
+        expect(diffPercentage).toMatchScreenshotWithinPercent(1);
       }
     }
   );

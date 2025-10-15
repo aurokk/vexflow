@@ -3,6 +3,10 @@
 
 import { ContextBuilder, Factory, Flow, Font, RenderContext, Renderer } from '../src/index';
 
+import { server } from '@vitest/browser/context';
+import { Canvg } from 'canvg';
+import pixelmatch from 'pixelmatch';
+import * as UPNG from 'upng-js';
 import { expect } from 'vitest';
 
 // Re-export ContextBuilder for use in test files
@@ -28,16 +32,16 @@ export interface Assert {
 // Create a Vitest-compatible assert object
 export function createAssert(): Assert {
   return {
-    ok: (value: any, message?: string) => expect(value, message).toBeTruthy(),
-    equal: (actual: any, expected: any, message?: string) => expect(actual, message).toBe(expected),
-    notEqual: (actual: any, expected: any, message?: string) => expect(actual, message).not.toBe(expected),
-    strictEqual: (actual: any, expected: any, message?: string) => expect(actual, message).toBe(expected),
-    propEqual: (actual: any, expected: any, message?: string) => expect(actual, message).toEqual(expected),
+    ok: (value: any, message?: string) => expect(value).toBeTruthy(),
+    equal: (actual: any, expected: any, message?: string) => expect(actual).toBe(expected),
+    notEqual: (actual: any, expected: any, message?: string) => expect(actual).not.toBe(expected),
+    strictEqual: (actual: any, expected: any, message?: string) => expect(actual).toBe(expected),
+    propEqual: (actual: any, expected: any, message?: string) => expect(actual).toEqual(expected),
     throws: (fn: () => void, expected?: RegExp | string, message?: string) => {
       if (expected) {
-        expect(fn, message).toThrow(expected);
+        expect(fn).toThrow(expected);
       } else {
-        expect(fn, message).toThrow();
+        expect(fn).toThrow();
       }
     },
   };
@@ -181,3 +185,115 @@ export const MINOR_KEYS = [
   'D#m',
   'A#m',
 ];
+
+// Screenshot comparison utilities
+const { readFile, writeFile } = server.commands;
+
+function buf2hex(buffer: ArrayBuffer): string {
+  return [...new Uint8Array(buffer)].map((x) => x.toString(16).padStart(2, '0')).join('');
+}
+
+function hex2buf(hex: string): ArrayBuffer {
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < hex.length; i += 2) {
+    bytes[i / 2] = parseInt(hex.substring(i, i + 2), 16);
+  }
+  return bytes.buffer;
+}
+
+export interface ScreenshotOptions {
+  filepath: string;
+  width: number;
+  height: number;
+}
+
+/**
+ * Reads or saves a screenshot PNG file.
+ * If the file doesn't exist, it saves the new screenshot and returns it.
+ * If the file exists, it returns the existing screenshot.
+ */
+export async function readOrSaveScreenshot(newpng: ArrayBuffer, options: ScreenshotOptions): Promise<ArrayBuffer> {
+  const { filepath } = options;
+
+  let oldpng: ArrayBuffer | null = null;
+  try {
+    const oldhex = await readFile(filepath, { encoding: 'hex' });
+    oldpng = hex2buf(oldhex);
+  } catch {
+    // File doesn't exist
+  }
+
+  if (!oldpng) {
+    const newhex = buf2hex(newpng);
+    await writeFile(filepath, newhex, { encoding: 'hex' });
+    const oldhex = await readFile(filepath, { encoding: 'hex' });
+    oldpng = hex2buf(oldhex);
+  }
+
+  return oldpng;
+}
+
+/**
+ * Captures a canvas screenshot and encodes it as PNG.
+ */
+export function captureCanvasScreenshot(canvas: HTMLCanvasElement): ArrayBuffer {
+  const width = canvas.width;
+  const height = canvas.height;
+  const imageData = canvas.getContext('2d')!.getImageData(0, 0, width, height).data;
+  return UPNG.encode([imageData.buffer], width, height, 0);
+}
+
+/**
+ * Captures an SVG screenshot by converting it to a canvas and encoding as PNG.
+ */
+export async function captureSvgScreenshot(svgHTML: string, width: number, height: number): Promise<ArrayBuffer> {
+  const canvas = document.createElement('canvas');
+  const context = canvas.getContext('2d')!;
+  const canvg = Canvg.fromString(context, svgHTML);
+  canvg.resize(width, height, true);
+  await canvg.render();
+
+  const imageData = context.getImageData(0, 0, width, height).data;
+  return UPNG.encode([imageData.buffer], width, height, 0);
+}
+
+/**
+ * Compares two PNG buffers and returns the pixel difference percentage.
+ */
+export function compareScreenshots(oldpng: ArrayBuffer, newpng: ArrayBuffer, width: number, height: number): number {
+  const oldDecoded = UPNG.decode(oldpng);
+  const newDecoded = UPNG.decode(newpng);
+
+  const diff = pixelmatch(
+    new Uint8Array(UPNG.toRGBA8(oldDecoded)[0]),
+    new Uint8Array(UPNG.toRGBA8(newDecoded)[0]),
+    new Uint8Array(width * height * 4),
+    width,
+    height
+  );
+
+  return (diff * 100) / (width * height * 4);
+}
+
+/**
+ * Custom Vitest matcher to assert that screenshot difference is within a threshold.
+ */
+export function toMatchScreenshotWithinPercent(received: number, threshold: number = 1) {
+  const pass = received <= threshold;
+
+  return {
+    pass,
+    message: () =>
+      pass
+        ? `Expected screenshot difference ${received.toFixed(4)}% to exceed ${threshold}%`
+        : `Expected screenshot difference ${received.toFixed(4)}% to be within ${threshold}%`,
+  };
+}
+
+/**
+ * Custom Vitest matcher to assert that screenshot difference is within 1%.
+ * This is a convenience wrapper around toMatchScreenshotWithinPercent with a 1% threshold.
+ */
+export function toMatchScreenshotWithinOnePercent(received: number) {
+  return toMatchScreenshotWithinPercent(received, 1);
+}
