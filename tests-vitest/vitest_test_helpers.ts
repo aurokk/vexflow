@@ -308,3 +308,50 @@ export function toMatchScreenshotWithinPercent(received: number, threshold: numb
 export function toMatchScreenshotWithinOnePercent(received: number) {
   return toMatchScreenshotWithinPercent(received, 1);
 }
+
+/**
+ * All-in-one screenshot comparison for rendering tests.
+ *
+ * This function:
+ * 1. Captures a screenshot (Canvas or SVG based on backend)
+ * 2. Reads or saves the reference screenshot
+ * 3. Compares the screenshots and asserts the difference is within threshold
+ *
+ * @param options - Test options containing elementId, backend, testName, and fontStackName
+ * @param testFilename - The test file name (e.g., 'accidental_tests.test.ts')
+ * @param threshold - Maximum allowed pixel difference percentage (default: 1%)
+ *
+ * @example
+ * // In your test:
+ * await expectMatchingScreenshot(options, 'accidental_tests.test.ts');
+ */
+export async function expectMatchingScreenshot(
+  options: TestOptions,
+  testFilename: string,
+  threshold: number = 1
+): Promise<void> {
+  if (options.backend === Renderer.Backends.CANVAS) {
+    const canvas = document.getElementById(options.elementId) as HTMLCanvasElement;
+    const width = canvas.width;
+    const height = canvas.height;
+    const filepath = `tests-vitest/__screenshots__/${testFilename}/${options.testName} - Canvas - ${options.fontStackName}.png`;
+
+    const newpng = captureCanvasScreenshot(canvas);
+    const oldpng = await readOrSaveScreenshot(newpng, { filepath, width, height });
+    const diffPercentage = compareScreenshots(oldpng, newpng, width, height);
+
+    expect(diffPercentage).toMatchScreenshotWithinPercent(threshold);
+  } else if (options.backend === Renderer.Backends.SVG) {
+    const div = document.getElementById(options.elementId) as HTMLDivElement;
+    const scale = 2;
+    const width = 700 * scale;
+    const height = 240 * scale;
+    const filepath = `tests-vitest/__screenshots__/${testFilename}/${options.testName} - SVG - ${options.fontStackName}.png`;
+
+    const newpng = await captureSvgScreenshot(div.innerHTML, width, height);
+    const oldpng = await readOrSaveScreenshot(newpng, { filepath, width, height });
+    const diffPercentage = compareScreenshots(oldpng, newpng, width, height);
+
+    expect(diffPercentage).toMatchScreenshotWithinPercent(threshold);
+  }
+}
