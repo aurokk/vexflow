@@ -218,7 +218,7 @@ export interface ScreenshotOptions {
  *
  * Usage:
  * - Normal mode: `npm run test:vitest` or `npm run test:vitest:ci` - compares against existing screenshots
- * - To update all screenshots: `npm run test:vitest:update` - deletes old screenshots and generates new ones
+ * - To update screenshots: `npm run test:vitest:clean` then re-run tests
  */
 export async function readOrSaveScreenshot(newpng: ArrayBuffer, options: ScreenshotOptions): Promise<ArrayBuffer> {
   const { filepath } = options;
