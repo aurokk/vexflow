@@ -21,6 +21,10 @@ export default defineConfig({
     // Test file patterns
     include: ['tests-vitest/**/*.test.ts'],
 
+    env: {
+      VEXFLOW_VISUAL_REGRESSION: process.env.VEXFLOW_VISUAL_REGRESSION || '0',
+    },
+
     // Coverage configuration
     coverage: {
       provider: 'v8',

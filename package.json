@@ -151,6 +151,8 @@
     "test:vitest:ci": "vitest run --config vitest.config.ci.ts",
     "test:vitest:ui": "vitest run --ui --config vitest.config.dev.ts",
     "test:vitest:watch": "vitest --config vitest.config.dev.ts",
+    "test:vitest:visual": "VEXFLOW_VISUAL_REGRESSION=1 vitest run --config vitest.config.dev.ts",
+    "test:vitest:visual:watch": "VEXFLOW_VISUAL_REGRESSION=1 vitest --config vitest.config.dev.ts",
     "test:vitest:clean": "rm -rf tests-vitest/__screenshots__",
     "reference": "grunt reference",
     "test:reference": "grunt test:reference",

@@ -324,12 +324,28 @@ export function toMatchScreenshotWithinOnePercent(received: number) {
 }
 
 /**
+ * Check if visual regression testing is enabled.
+ * By default, screenshot assertions are disabled to speed up tests.
+ *
+ * Enable by setting the VEXFLOW_VISUAL_REGRESSION environment variable:
+ * - `VEXFLOW_VISUAL_REGRESSION=1 npm run test:vitest`
+ * - Or set it in your test command
+ */
+function isVisualRegressionEnabled(): boolean {
+  // Use import.meta.env for Vite/Vitest browser environment
+  return import.meta.env.VEXFLOW_VISUAL_REGRESSION === '1' || import.meta.env.VEXFLOW_VISUAL_REGRESSION === 'true';
+}
+
+/**
  * All-in-one screenshot comparison for rendering tests.
  *
  * This function:
  * 1. Captures a screenshot (Canvas or SVG based on backend)
  * 2. Reads or saves the reference screenshot
  * 3. Compares the screenshots and asserts the difference is within threshold
+ *
+ * By default, screenshot assertions are DISABLED for faster test execution.
+ * Enable by setting VEXFLOW_VISUAL_REGRESSION=1 environment variable.
  *
  * @param options - Test options containing elementId, backend, testName, and fontStackName
  * @param testFilename - The test file name (e.g., 'accidental_tests.test.ts')
@@ -338,12 +354,20 @@ export function toMatchScreenshotWithinOnePercent(received: number) {
  * @example
  * // In your test:
  * await expectMatchingScreenshot(options, 'accidental_tests.test.ts');
+ *
+ * // Enable visual regression:
+ * // VEXFLOW_VISUAL_REGRESSION=1 npm run test:vitest
  */
 export async function expectMatchingScreenshot(
   options: TestOptions,
   testFilename: string,
   threshold: number = 1
 ): Promise<void> {
+  // Skip screenshot comparison if visual regression is disabled
+  if (!isVisualRegressionEnabled()) {
+    return;
+  }
+
   if (options.backend === Renderer.Backends.CANVAS) {
     const canvas = document.getElementById(options.elementId) as HTMLCanvasElement;
     const width = canvas.width;
