@@ -9,13 +9,13 @@ import { Flow } from '../src/flow';
 import { Font, FontStyle, FontWeight } from '../src/font';
 import { ContextBuilder, Renderer } from '../src/renderer';
 import { TextFormatter } from '../src/textformatter';
-import { createAssert, FONT_STACKS, generateTestID, TestOptions } from './vitest_test_helpers';
+import { createAssert, expectMatchingScreenshot, FONT_STACKS, generateTestID, TestOptions } from './vitest_test_helpers';
 
 describe('TextFormatter', () => {
   // Helper function to run a test with multiple backends and font stacks
-  function runTest(
+  async function runTest(
     testName: string,
-    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void | Promise<void>,
     backends: Array<{ backend: number; fontStacks: string[] }> = [
       { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
       { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
@@ -23,7 +23,7 @@ describe('TextFormatter', () => {
   ) {
     backends.forEach(({ backend, fontStacks }) => {
       fontStacks.forEach((fontStackName) => {
-        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, async () => {
           const elementId = generateTestID('textformatter_test');
 
           // Create the DOM element before the test runs
@@ -33,7 +33,13 @@ describe('TextFormatter', () => {
           document.body.appendChild(element);
 
           const assert = createAssert();
-          const options: TestOptions = { elementId, params: {}, backend };
+          const options: TestOptions = {
+            elementId,
+            params: {},
+            backend,
+            testName,
+            fontStackName,
+          };
 
           // Set font stack
           const originalFontNames = Flow.getMusicFont();
@@ -42,7 +48,7 @@ describe('TextFormatter', () => {
           try {
             const contextBuilder: ContextBuilder =
               backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
-            testFunc(options, contextBuilder);
+            await testFunc(options, contextBuilder);
           } finally {
             // Restore original font
             Flow.setMusicFont(...originalFontNames);
@@ -87,7 +93,7 @@ describe('TextFormatter', () => {
     assert.equal(formatterForRobotoSlab.cacheKey, 'Roboto_Slab%75%normal%normal');
   });
 
-  runTest('Accuracy', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Accuracy', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const ctx = contextBuilder(options.elementId, 600, 500);
     const lineHeight = 30;
@@ -130,10 +136,13 @@ describe('TextFormatter', () => {
         startY += lineHeight;
       }
     }
+
+    await expectMatchingScreenshot(options, 'textformatter_tests.test.ts');
+
     assert.ok(true, 'all pass');
   });
 
-  runTest('Box Text', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Box Text', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const ctx = contextBuilder(options.elementId, 600, 800);
     let startY = 35;
@@ -194,6 +203,9 @@ describe('TextFormatter', () => {
       }
       ctx.restore();
     }
+
+    await expectMatchingScreenshot(options, 'textformatter_tests.test.ts');
+
     assert.ok(true, 'all pass');
   });
 });

@@ -24,7 +24,7 @@ import {
 import { describe, test } from 'vitest';
 
 import { Flow } from '../src/flow';
-import { createAssert, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
+import { createAssert, expectMatchingScreenshot, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
 
 /**
  * Helper function used by the drawNotes() test case below.
@@ -40,21 +40,22 @@ function showNote(struct: StaveNoteStruct, stave: Stave, ctx: RenderContext, x: 
  * Helper function for the seven test cases below.
  * Adds a percussion clef (two short vertical bars, like a pause sign) to the stave.
  */
-function createSingleMeasureTest(setup: (f: Factory) => void, options: TestOptions, contextBuilder: ContextBuilder): void {
+async function createSingleMeasureTest(setup: (f: Factory) => void, options: TestOptions, contextBuilder: ContextBuilder): Promise<void> {
   const assert = createAssert();
-  const f = makeFactory(options.backend, options.elementId, 500);
+  const f = makeFactory(options.backend, options.elementId, 500, 140, options);
   const stave = f.Stave().addClef('percussion').setTimeSignature('4/4');
   setup(f);
   f.Formatter().joinVoices(f.getVoices()).formatToStave(f.getVoices(), stave);
   f.draw();
+  await expectMatchingScreenshot(options, 'percussion_tests.test.ts');
   assert.ok(true);
 }
 
 describe('Percussion', () => {
   // Helper function to run a test with multiple backends and font stacks
-  function runTest(
+  async function runTest(
     testName: string,
-    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void | Promise<void>,
     backends: Array<{ backend: number; fontStacks: string[] }> = [
       { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
       { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
@@ -62,7 +63,7 @@ describe('Percussion', () => {
   ) {
     backends.forEach(({ backend, fontStacks }) => {
       fontStacks.forEach((fontStackName) => {
-        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, async () => {
           const elementId = generateTestID('percussion_test');
 
           // Create the DOM element before the test runs
@@ -72,7 +73,7 @@ describe('Percussion', () => {
           document.body.appendChild(element);
 
           const assert = createAssert();
-          const options: TestOptions = { elementId, params: {}, backend };
+          const options: TestOptions = { elementId, params: {}, backend, testName, fontStackName };
 
           // Set font stack
           const originalFontNames = Flow.getMusicFont();
@@ -81,7 +82,7 @@ describe('Percussion', () => {
           try {
             const contextBuilder: ContextBuilder =
               backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
-            testFunc(options, contextBuilder);
+            await testFunc(options, contextBuilder);
           } finally {
             // Restore original font
             Flow.setMusicFont(...originalFontNames);
@@ -93,14 +94,17 @@ describe('Percussion', () => {
     });
   }
 
-  runTest('Percussion Clef', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Percussion Clef', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
+    options.width = 400;
+    options.height = 120;
     const ctx = contextBuilder(options.elementId, 400, 120);
     new Stave(10, 10, 300).addClef('percussion').setContext(ctx).draw();
+    await expectMatchingScreenshot(options, 'percussion_tests.test.ts');
     assert.ok(true);
   });
 
-  runTest('Percussion Notes', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Percussion Notes', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const notes: StaveNoteStruct[] = [
       { keys: ['g/5/d0'], duration: '4' },
@@ -121,6 +125,8 @@ describe('Percussion', () => {
       { keys: ['g/5/x3'], duration: '4' },
     ];
 
+    options.width = notes.length * 25 + 100;
+    options.height = 240;
     const ctx = contextBuilder(options.elementId, notes.length * 25 + 100, 240);
 
     // Draw two staves, one with up-stems and one with down-stems.
@@ -136,10 +142,11 @@ describe('Percussion', () => {
         assert.ok(staveNote.getYs().length > 0, 'Note ' + i + ' has Y values');
       }
     }
+    await expectMatchingScreenshot(options, 'percussion_tests.test.ts');
   });
 
-  runTest('Percussion Basic0', (options: TestOptions, contextBuilder: ContextBuilder) => {
-    createSingleMeasureTest((f) => {
+  runTest('Percussion Basic0', async (options: TestOptions, contextBuilder: ContextBuilder) => {
+    await createSingleMeasureTest((f) => {
       const voice0 = f
         .Voice()
         .addTickables([
@@ -170,8 +177,8 @@ describe('Percussion', () => {
     }, options, contextBuilder);
   });
 
-  runTest('Percussion Basic1', (options: TestOptions, contextBuilder: ContextBuilder) => {
-    createSingleMeasureTest((f) => {
+  runTest('Percussion Basic1', async (options: TestOptions, contextBuilder: ContextBuilder) => {
+    await createSingleMeasureTest((f) => {
       f.Voice().addTickables([
         f.StaveNote({ keys: ['f/5/x2'], duration: '4' }),
         f.StaveNote({ keys: ['f/5/x2'], duration: '4' }),
@@ -188,8 +195,8 @@ describe('Percussion', () => {
     }, options, contextBuilder);
   });
 
-  runTest('Percussion Basic2', (options: TestOptions, contextBuilder: ContextBuilder) => {
-    createSingleMeasureTest((f) => {
+  runTest('Percussion Basic2', async (options: TestOptions, contextBuilder: ContextBuilder) => {
+    await createSingleMeasureTest((f) => {
       const voice0 = f
         .Voice()
         .addTickables([
@@ -221,8 +228,8 @@ describe('Percussion', () => {
     }, options, contextBuilder);
   });
 
-  runTest('Percussion Snare0', (options: TestOptions, contextBuilder: ContextBuilder) => {
-    createSingleMeasureTest((f) => {
+  runTest('Percussion Snare0', async (options: TestOptions, contextBuilder: ContextBuilder) => {
+    await createSingleMeasureTest((f) => {
       const font = {
         family: Font.SERIF,
         size: 14,
@@ -248,8 +255,8 @@ describe('Percussion', () => {
     }, options, contextBuilder);
   });
 
-  runTest('Percussion Snare1', (options: TestOptions, contextBuilder: ContextBuilder) => {
-    createSingleMeasureTest((f) => {
+  runTest('Percussion Snare1', async (options: TestOptions, contextBuilder: ContextBuilder) => {
+    await createSingleMeasureTest((f) => {
       f.Voice().addTickables([
         f
           .StaveNote({ keys: ['g/5/x2'], duration: '4', stem_direction: -1 })
@@ -265,8 +272,8 @@ describe('Percussion', () => {
     }, options, contextBuilder);
   });
 
-  runTest('Percussion Snare2', (options: TestOptions, contextBuilder: ContextBuilder) => {
-    createSingleMeasureTest((f) => {
+  runTest('Percussion Snare2', async (options: TestOptions, contextBuilder: ContextBuilder) => {
+    await createSingleMeasureTest((f) => {
       f.Voice().addTickables([
         f.StaveNote({ keys: ['c/5'], duration: '4', stem_direction: -1 }).addModifier(new Tremolo(1), 0),
         f.GraceNote({ keys: ['c/5'], duration: '4', stem_direction: -1 }).addModifier(new Tremolo(1), 0),
@@ -276,8 +283,8 @@ describe('Percussion', () => {
     }, options, contextBuilder);
   });
 
-  runTest('Percussion Snare3', (options: TestOptions, contextBuilder: ContextBuilder) => {
-    createSingleMeasureTest((factory) => {
+  runTest('Percussion Snare3', async (options: TestOptions, contextBuilder: ContextBuilder) => {
+    await createSingleMeasureTest((factory) => {
       factory
         .Voice()
         .addTickables([

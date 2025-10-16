@@ -10,7 +10,7 @@ import { ContextBuilder, Renderer } from '../src/renderer';
 import { Stave, StaveLineConfig } from '../src/stave';
 import { StaveConnector } from '../src/staveconnector';
 import { TimeSignature } from '../src/timesignature';
-import { createAssert, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
+import { createAssert, expectMatchingScreenshot, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
 
 describe('TimeSignature', () => {
   test('Time Signature Parser', () => {
@@ -48,9 +48,9 @@ describe('TimeSignature', () => {
   });
 
   // Helper function to run a test with multiple backends and font stacks
-  function runTest(
+  async function runTest(
     testName: string,
-    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void | Promise<void>,
     backends: Array<{ backend: number; fontStacks: string[] }> = [
       { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
       { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
@@ -58,7 +58,7 @@ describe('TimeSignature', () => {
   ) {
     backends.forEach(({ backend, fontStacks }) => {
       fontStacks.forEach((fontStackName) => {
-        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, async () => {
           const elementId = generateTestID('timesig_test');
 
           // Create the DOM element before the test runs
@@ -67,7 +67,7 @@ describe('TimeSignature', () => {
           element.id = elementId;
           document.body.appendChild(element);
 
-          const options: TestOptions = { elementId, params: {}, backend };
+          const options: TestOptions = { elementId, params: {}, backend, testName, fontStackName };
 
           // Set font stack
           const originalFontNames = Flow.getMusicFont();
@@ -76,7 +76,7 @@ describe('TimeSignature', () => {
           try {
             const contextBuilder: ContextBuilder =
               backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
-            testFunc(options, contextBuilder);
+            await testFunc(options, contextBuilder);
           } finally {
             // Restore original font
             Flow.setMusicFont(...originalFontNames);
@@ -88,7 +88,7 @@ describe('TimeSignature', () => {
     });
   }
 
-  runTest('Basic Time Signatures', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Basic Time Signatures', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const ctx = contextBuilder(options.elementId, 600, 120);
 
@@ -109,10 +109,11 @@ describe('TimeSignature', () => {
       .setContext(ctx)
       .draw();
 
+    await expectMatchingScreenshot(options, 'timesignature_tests.test.ts');
     assert.ok(true, 'all pass');
   });
 
-  runTest('Big Signature Test', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Big Signature Test', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const ctx = contextBuilder(options.elementId, 400, 120);
 
@@ -124,37 +125,41 @@ describe('TimeSignature', () => {
       .setContext(ctx)
       .draw();
 
+    await expectMatchingScreenshot(options, 'timesignature_tests.test.ts');
     assert.ok(true, 'all pass');
   });
 
-  runTest('Additive Signature Test', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Additive Signature Test', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const ctx = contextBuilder(options.elementId, 400, 120);
 
     new Stave(10, 10, 300).addTimeSignature('2+3+2/8').setContext(ctx).draw();
 
+    await expectMatchingScreenshot(options, 'timesignature_tests.test.ts');
     assert.ok(true, 'all pass');
   });
 
-  runTest('Alternating Signature Test', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Alternating Signature Test', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const ctx = contextBuilder(options.elementId, 400, 120);
 
     new Stave(10, 10, 300).addTimeSignature('6/8').addTimeSignature('+').addTimeSignature('3/4').setContext(ctx).draw();
 
+    await expectMatchingScreenshot(options, 'timesignature_tests.test.ts');
     assert.ok(true, 'all pass');
   });
 
-  runTest('Interchangeable Signature Test', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Interchangeable Signature Test', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const ctx = contextBuilder(options.elementId, 400, 120);
 
     new Stave(10, 10, 300).addTimeSignature('3/4').addTimeSignature('-').addTimeSignature('2/4').setContext(ctx).draw();
 
+    await expectMatchingScreenshot(options, 'timesignature_tests.test.ts');
     assert.ok(true, 'all pass');
   });
 
-  runTest('Aggregate Signature Test', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Aggregate Signature Test', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const ctx = contextBuilder(options.elementId, 400, 120);
 
@@ -167,10 +172,11 @@ describe('TimeSignature', () => {
       .setContext(ctx)
       .draw();
 
+    await expectMatchingScreenshot(options, 'timesignature_tests.test.ts');
     assert.ok(true, 'all pass');
   });
 
-  runTest('Complex Signature Test', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Complex Signature Test', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const ctx = contextBuilder(options.elementId, 400, 120);
 
@@ -181,10 +187,11 @@ describe('TimeSignature', () => {
       .setContext(ctx)
       .draw();
 
+    await expectMatchingScreenshot(options, 'timesignature_tests.test.ts');
     assert.ok(true, 'all pass');
   });
 
-  runTest('Time Signature multiple staves alignment test', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Time Signature multiple staves alignment test', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const ctx = contextBuilder(options.elementId, 400, 350);
 
@@ -204,12 +211,13 @@ describe('TimeSignature', () => {
     new StaveConnector(stave2, stave3).setType('single').setContext(ctx).draw();
     new StaveConnector(stave2, stave3).setType('brace').setContext(ctx).draw();
 
+    await expectMatchingScreenshot(options, 'timesignature_tests.test.ts');
     assert.ok(true, 'all pass');
   });
 
-  runTest('Time Signature Change Test', (options: TestOptions) => {
+  runTest('Time Signature Change Test', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 900);
+    const f = makeFactory(options.backend, options.elementId, 900, 140, options);
     const stave = f.Stave({ x: 0, y: 0 }).addClef('treble').addTimeSignature('C|');
 
     const tickables = [
@@ -227,6 +235,7 @@ describe('TimeSignature', () => {
     f.Formatter().joinVoices([voice]).formatToStave([voice], stave);
     f.draw();
 
+    await expectMatchingScreenshot(options, 'timesignature_tests.test.ts');
     assert.ok(true, 'all pass');
   });
 });

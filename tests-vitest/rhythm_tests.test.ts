@@ -13,13 +13,20 @@ import { Renderer } from '../src/renderer';
 import { Stave } from '../src/stave';
 import { BarlineType } from '../src/stavebarline';
 import { StaveNote } from '../src/stavenote';
-import { ContextBuilder, createAssert, FONT_STACKS, generateTestID, TestOptions } from './vitest_test_helpers';
+import {
+  ContextBuilder,
+  createAssert,
+  expectMatchingScreenshot,
+  FONT_STACKS,
+  generateTestID,
+  TestOptions,
+} from './vitest_test_helpers';
 
 describe('Rhythm', () => {
   // Helper function to run a test with multiple backends and font stacks
-  function runTest(
+  async function runTest(
     testName: string,
-    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void | Promise<void>,
     backends: Array<{ backend: number; fontStacks: string[] }> = [
       { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
       { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
@@ -27,7 +34,7 @@ describe('Rhythm', () => {
   ) {
     backends.forEach(({ backend, fontStacks }) => {
       fontStacks.forEach((fontStackName) => {
-        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, async () => {
           const elementId = generateTestID('rhythm_test');
 
           // Create the DOM element before the test runs
@@ -37,7 +44,7 @@ describe('Rhythm', () => {
           document.body.appendChild(element);
 
           const assert = createAssert();
-          const options: TestOptions = { elementId, params: {}, backend };
+          const options: TestOptions = { elementId, params: {}, backend, testName, fontStackName };
 
           // Set font stack
           const originalFontNames = Flow.getMusicFont();
@@ -46,7 +53,7 @@ describe('Rhythm', () => {
           try {
             const contextBuilder: ContextBuilder =
               backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
-            testFunc(options, contextBuilder);
+            await testFunc(options, contextBuilder);
           } finally {
             // Restore original font
             Flow.setMusicFont(...originalFontNames);
@@ -58,7 +65,7 @@ describe('Rhythm', () => {
     });
   }
 
-  runTest('Rhythm Draw - slash notes', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Rhythm Draw - slash notes', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const ctx = contextBuilder(options.elementId, 800, 150);
 
@@ -172,10 +179,11 @@ describe('Rhythm', () => {
 
     // Helper function to justify and draw a 4/4 voice
     Formatter.FormatAndDraw(ctx, staveBar4, notesBar4);
+    await expectMatchingScreenshot(options, 'rhythm_tests.test.ts');
     assert.ok(true);
   });
 
-  runTest('Rhythm Draw - beamed slash notes', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Rhythm Draw - beamed slash notes', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const ctx = contextBuilder(options.elementId, 800, 150);
 
@@ -247,10 +255,11 @@ describe('Rhythm', () => {
     beam1.setContext(ctx).draw();
     beam2.setContext(ctx).draw();
 
+    await expectMatchingScreenshot(options, 'rhythm_tests.test.ts');
     assert.ok(true);
   });
 
-  runTest('Rhythm Draw - beamed slash notes, some rests', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Rhythm Draw - beamed slash notes, some rests', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const ctx = contextBuilder(options.elementId, 800, 150);
 
@@ -333,10 +342,11 @@ describe('Rhythm', () => {
     // Helper function to justify and draw a 4/4 voice
     Formatter.FormatAndDraw(ctx, staveBar2, notesBar2);
 
+    await expectMatchingScreenshot(options, 'rhythm_tests.test.ts');
     assert.ok(true);
   });
 
-  runTest('Rhythm Draw - 16th note rhythm with scratches', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Rhythm Draw - 16th note rhythm with scratches', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const ctx = contextBuilder(options.elementId, 800, 150);
 
@@ -409,10 +419,11 @@ describe('Rhythm', () => {
     beam1.setContext(ctx).draw();
     beam2.setContext(ctx).draw();
 
+    await expectMatchingScreenshot(options, 'rhythm_tests.test.ts');
     assert.ok(true);
   });
 
-  runTest('Rhythm Draw - 32nd note rhythm with scratches', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Rhythm Draw - 32nd note rhythm with scratches', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const ctx = contextBuilder(options.elementId, 800, 150);
 
@@ -480,6 +491,7 @@ describe('Rhythm', () => {
     // Render beams
     beam1.setContext(ctx).draw();
 
+    await expectMatchingScreenshot(options, 'rhythm_tests.test.ts');
     assert.ok(true);
   });
 });

@@ -27,7 +27,7 @@ import { Stem } from '../src/stem';
 import { StringNumber } from '../src/stringnumber';
 import { Stroke } from '../src/strokes';
 import { TickContext } from '../src/tickcontext';
-import { createAssert, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
+import { createAssert, expectMatchingScreenshot, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
 
 // Helper function to create StaveNotes.
 const staveNote = (struct: StaveNoteStruct) => new StaveNote(struct);
@@ -66,9 +66,9 @@ function draw(
 
 describe('StaveNote', () => {
   // Helper function to run a test with multiple backends and font stacks
-  function runTest(
+  async function runTest(
     testName: string,
-    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void | Promise<void>,
     backends: Array<{ backend: number; fontStacks: string[] }> = [
       { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
       { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
@@ -76,7 +76,7 @@ describe('StaveNote', () => {
   ) {
     backends.forEach(({ backend, fontStacks }) => {
       fontStacks.forEach((fontStackName) => {
-        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, async () => {
           const elementId = generateTestID('stavenote_test');
 
           // Create the DOM element before the test runs
@@ -85,8 +85,13 @@ describe('StaveNote', () => {
           element.id = elementId;
           document.body.appendChild(element);
 
-          const assert = createAssert();
-          const options: TestOptions = { elementId, params: {}, backend };
+          const options: TestOptions = {
+            elementId,
+            params: {},
+            backend,
+            testName,
+            fontStackName,
+          };
 
           // Set font stack
           const originalFontNames = Flow.getMusicFont();
@@ -95,7 +100,7 @@ describe('StaveNote', () => {
           try {
             const contextBuilder: ContextBuilder =
               backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
-            testFunc(options, contextBuilder);
+            await testFunc(options, contextBuilder);
           } finally {
             // Restore original font
             Flow.setMusicFont(...originalFontNames);
@@ -406,7 +411,7 @@ describe('StaveNote', () => {
     }
   });
 
-  runTest('StaveNote Draw - Treble', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('StaveNote Draw - Treble', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
 
     const clef = 'treble';
@@ -466,9 +471,11 @@ describe('StaveNote', () => {
       assert.ok(note.getX() > 0, 'Note ' + i + ' has X value');
       assert.ok(note.getYs().length > 0, 'Note ' + i + ' has Y values');
     }
+
+    await expectMatchingScreenshot(options, 'stavenote_tests.test.ts');
   });
 
-  runTest('StaveNote BoundingBoxes - Treble', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('StaveNote BoundingBoxes - Treble', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
 
     const clef = 'treble';
@@ -535,9 +542,11 @@ describe('StaveNote', () => {
       assert.ok(note.getX() > 0, 'Note ' + i + ' has X value');
       assert.ok(note.getYs().length > 0, 'Note ' + i + ' has Y values');
     }
+
+    await expectMatchingScreenshot(options, 'stavenote_tests.test.ts');
   });
 
-  runTest('StaveNote Draw - Alto', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('StaveNote Draw - Alto', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
 
     const clef = 'alto';
@@ -597,9 +606,12 @@ describe('StaveNote', () => {
       assert.ok(note.getX() > 0, 'Note ' + i + ' has X value');
       assert.ok(note.getYs().length > 0, 'Note ' + i + ' has Y values');
     }
+
+    await expectMatchingScreenshot(options, 'stavenote_tests.test.ts');
+
   });
 
-  runTest('StaveNote Draw - Tenor', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('StaveNote Draw - Tenor', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
 
     const clef = 'tenor';
@@ -659,9 +671,12 @@ describe('StaveNote', () => {
       assert.ok(note.getX() > 0, 'Note ' + i + ' has X value');
       assert.ok(note.getYs().length > 0, 'Note ' + i + ' has Y values');
     }
+
+    await expectMatchingScreenshot(options, 'stavenote_tests.test.ts');
+
   });
 
-  runTest('StaveNote Draw - Bass', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('StaveNote Draw - Bass', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
 
     const clef = 'bass';
@@ -721,9 +736,12 @@ describe('StaveNote', () => {
       assert.ok(note.getX() > 0, 'Note ' + i + ' has X value');
       assert.ok(note.getYs().length > 0, 'Note ' + i + ' has Y values');
     }
+
+    await expectMatchingScreenshot(options, 'stavenote_tests.test.ts');
+
   });
 
-  runTest('StaveNote Draw - Harmonic And Muted', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('StaveNote Draw - Harmonic And Muted', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
 
     const ctx = contextBuilder(options.elementId, 1000, 180);
@@ -777,9 +795,12 @@ describe('StaveNote', () => {
       assert.ok(note.getX() > 0, 'Note ' + i + ' has X value');
       assert.ok(note.getYs().length > 0, 'Note ' + i + ' has Y values');
     }
+
+    await expectMatchingScreenshot(options, 'stavenote_tests.test.ts');
+
   });
 
-  runTest('StaveNote Draw - Slash', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('StaveNote Draw - Slash', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
 
     const ctx = contextBuilder(options.elementId, 700, 180);
@@ -825,9 +846,12 @@ describe('StaveNote', () => {
     beam2.setContext(ctx).draw();
 
     assert.ok('Slash Note Heads');
+
+    await expectMatchingScreenshot(options, 'stavenote_tests.test.ts');
+
   });
 
-  runTest('Displacements', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Displacements', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
 
     const ctx = contextBuilder(options.elementId, 700, 155);
@@ -864,9 +888,12 @@ describe('StaveNote', () => {
       assert.ok(note.getX() > 0, 'Note ' + i + ' has X value');
       assert.ok(note.getYs().length > 0, 'Note ' + i + ' has Y values');
     }
+
+    await expectMatchingScreenshot(options, 'stavenote_tests.test.ts');
+
   });
 
-  runTest('StaveNote Draw - Bass 2', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('StaveNote Draw - Bass 2', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
 
     const ctx = contextBuilder(options.elementId, 600, 280);
@@ -905,9 +932,12 @@ describe('StaveNote', () => {
       assert.ok(note.getX() > 0, 'Note ' + i + ' has X value');
       assert.ok(note.getYs().length > 0, 'Note ' + i + ' has Y values');
     }
+
+    await expectMatchingScreenshot(options, 'stavenote_tests.test.ts');
+
   });
 
-  runTest('StaveNote Draw - Key Styles', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('StaveNote Draw - Key Styles', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
 
     const ctx = contextBuilder(options.elementId, 300, 280);
@@ -927,9 +957,12 @@ describe('StaveNote', () => {
 
     assert.ok(note.getX() > 0, 'Note has X value');
     assert.ok(note.getYs().length > 0, 'Note has Y values');
+
+    await expectMatchingScreenshot(options, 'stavenote_tests.test.ts');
+
   });
 
-  runTest('StaveNote Draw - StaveNote Stem Styles', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('StaveNote Draw - StaveNote Stem Styles', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
 
     const ctx = contextBuilder(options.elementId, 300, 280);
@@ -948,9 +981,12 @@ describe('StaveNote', () => {
     note.setContext(ctx).draw();
 
     assert.ok('Note Stem Style');
+
+    await expectMatchingScreenshot(options, 'stavenote_tests.test.ts');
+
   });
 
-  runTest('StaveNote Draw - StaveNote Stem Lengths', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('StaveNote Draw - StaveNote Stem Lengths', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
 
     const ctx = contextBuilder(options.elementId, 975, 150);
@@ -1004,9 +1040,12 @@ describe('StaveNote', () => {
     Formatter.FormatAndDraw(ctx, stave, notes);
 
     assert.ok('Note Stem Length');
+
+    await expectMatchingScreenshot(options, 'stavenote_tests.test.ts');
+
   });
 
-  runTest('StaveNote Draw - StaveNote Flag Styles', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('StaveNote Draw - StaveNote Flag Styles', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
 
     const ctx = contextBuilder(options.elementId, 300, 280);
@@ -1026,9 +1065,12 @@ describe('StaveNote', () => {
 
     assert.ok(note.getX() > 0, 'Note has X value');
     assert.ok(note.getYs().length > 0, 'Note has Y values');
+
+    await expectMatchingScreenshot(options, 'stavenote_tests.test.ts');
+
   });
 
-  runTest('StaveNote Draw - StaveNote Styles', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('StaveNote Draw - StaveNote Styles', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
 
     const ctx = contextBuilder(options.elementId, 300, 280);
@@ -1048,9 +1090,12 @@ describe('StaveNote', () => {
 
     assert.ok(note.getX() > 0, 'Note has X value');
     assert.ok(note.getYs().length > 0, 'Note has Y values');
+
+    await expectMatchingScreenshot(options, 'stavenote_tests.test.ts');
+
   });
 
-  runTest('Stave, Ledger Line, Beam, Stem and Flag Styles', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Stave, Ledger Line, Beam, Stem and Flag Styles', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
 
     const ctx = contextBuilder(options.elementId, 400, 160);
@@ -1116,9 +1161,12 @@ describe('StaveNote', () => {
     beam4.setContext(ctx).draw();
 
     assert.ok('draw beam styles');
+
+    await expectMatchingScreenshot(options, 'stavenote_tests.test.ts');
+
   });
 
-  runTest('Flag and Dot Placement - Stem Up', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Flag and Dot Placement - Stem Up', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
 
     const ctx = contextBuilder(options.elementId, 800, 150);
@@ -1150,9 +1198,12 @@ describe('StaveNote', () => {
     }
 
     assert.ok(true, 'Full Dot');
+
+    await expectMatchingScreenshot(options, 'stavenote_tests.test.ts');
+
   });
 
-  runTest('Flag and Dots Placement - Stem Down', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Flag and Dots Placement - Stem Down', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
 
     const ctx = contextBuilder(options.elementId, 800, 160);
@@ -1183,9 +1234,12 @@ describe('StaveNote', () => {
     }
 
     assert.ok(true, 'Full Dot');
+
+    await expectMatchingScreenshot(options, 'stavenote_tests.test.ts');
+
   });
 
-  runTest('Beam and Dot Placement - Stem Up', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Beam and Dot Placement - Stem Up', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
 
     const ctx = contextBuilder(options.elementId, 800, 150);
@@ -1219,9 +1273,12 @@ describe('StaveNote', () => {
     beam.setContext(ctx).draw();
 
     assert.ok(true, 'Full Dot');
+
+    await expectMatchingScreenshot(options, 'stavenote_tests.test.ts');
+
   });
 
-  runTest('Beam and Dot Placement - Stem Down', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Beam and Dot Placement - Stem Down', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
 
     const ctx = contextBuilder(options.elementId, 800, 160);
@@ -1254,11 +1311,14 @@ describe('StaveNote', () => {
     beam.setContext(ctx).draw();
 
     assert.ok(true, 'Full Dot');
+
+    await expectMatchingScreenshot(options, 'stavenote_tests.test.ts');
+
   });
 
-  runTest('No Padding', (options: TestOptions) => {
+  runTest('No Padding', async (options: TestOptions) => {
     const assert = createAssert();
-    const vf = makeFactory(options.backend, options.elementId, 800, 500);
+    const vf = makeFactory(options.backend, options.elementId, 800, 500, options);
     const score = vf.EasyScore();
 
     function newStave(y: number, noPadding: boolean): void {
@@ -1292,11 +1352,13 @@ describe('StaveNote', () => {
     newStave(100, true);
     newStave(200, false);
     vf.draw();
+
+    await expectMatchingScreenshot(options, 'stavenote_tests.test.ts');
   });
 
-  runTest('Note Heads Placement - Simple', (options: TestOptions) => {
+  runTest('Note Heads Placement - Simple', async (options: TestOptions) => {
     const assert = createAssert();
-    const vf = makeFactory(options.backend, options.elementId, 800, 250);
+    const vf = makeFactory(options.backend, options.elementId, 800, 250, options);
     const score = vf.EasyScore();
 
     const system1 = vf.System({ y: 100, x: 50, width: 200 });
@@ -1329,11 +1391,13 @@ describe('StaveNote', () => {
     });
 
     vf.draw();
+
+    await expectMatchingScreenshot(options, 'stavenote_tests.test.ts');
   });
 
-  runTest('Note Heads Placement - Hidden Notes', (options: TestOptions) => {
+  runTest('Note Heads Placement - Hidden Notes', async (options: TestOptions) => {
     const assert = createAssert();
-    const vf = makeFactory(options.backend, options.elementId, 800, 250);
+    const vf = makeFactory(options.backend, options.elementId, 800, 250, options);
     const score = vf.EasyScore();
 
     const system1 = vf.System({ y: 100, x: 50, width: 200 });
@@ -1370,22 +1434,27 @@ describe('StaveNote', () => {
     });
 
     vf.draw();
+
+    await expectMatchingScreenshot(options, 'stavenote_tests.test.ts');
   });
 
-  runTest('Center Aligned Note', (options: TestOptions) => {
+  runTest('Center Aligned Note', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 400, 160);
+    const f = makeFactory(options.backend, options.elementId, 400, 160, options);
     const stave = f.Stave({ x: 10, y: 10, width: 350 }).addClef('treble').addTimeSignature('4/4');
     const note = f.StaveNote({ keys: ['b/4'], duration: '1r', align_center: true });
     const voice = f.Voice().setStrict(false).addTickables([note]);
     f.Formatter().joinVoices([voice]).formatToStave([voice], stave);
     f.draw();
     assert.ok(true);
+
+    await expectMatchingScreenshot(options, 'stavenote_tests.test.ts');
+
   });
 
-  runTest('Center Aligned Note with Articulation', (options: TestOptions) => {
+  runTest('Center Aligned Note with Articulation', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 400, 160);
+    const f = makeFactory(options.backend, options.elementId, 400, 160, options);
 
     const stave = f.Stave({ x: 10, y: 10, width: 350 }).addClef('treble').addTimeSignature('4/4');
 
@@ -1400,11 +1469,14 @@ describe('StaveNote', () => {
     f.draw();
 
     assert.ok(true);
+
+    await expectMatchingScreenshot(options, 'stavenote_tests.test.ts');
+
   });
 
-  runTest('Center Aligned Note with Annotation', (options: TestOptions) => {
+  runTest('Center Aligned Note with Annotation', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 400, 160);
+    const f = makeFactory(options.backend, options.elementId, 400, 160, options);
 
     const stave = f.Stave({ x: 10, y: 10, width: 350 }).addClef('treble').addTimeSignature('4/4');
 
@@ -1419,11 +1491,14 @@ describe('StaveNote', () => {
     f.draw();
 
     assert.ok(true);
+
+    await expectMatchingScreenshot(options, 'stavenote_tests.test.ts');
+
   });
 
-  runTest('Center Aligned Note - Multi Voice', (options: TestOptions) => {
+  runTest('Center Aligned Note - Multi Voice', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 400, 160);
+    const f = makeFactory(options.backend, options.elementId, 400, 160, options);
 
     const stave = f.Stave({ x: 10, y: 10, width: 350 }).addClef('treble').addTimeSignature('3/8');
 
@@ -1458,11 +1533,14 @@ describe('StaveNote', () => {
     f.draw();
 
     assert.ok(true);
+
+    await expectMatchingScreenshot(options, 'stavenote_tests.test.ts');
+
   });
 
-  runTest('Center Aligned Note with Multiple Modifiers', (options: TestOptions) => {
+  runTest('Center Aligned Note with Multiple Modifiers', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 400, 160);
+    const f = makeFactory(options.backend, options.elementId, 400, 160, options);
 
     const stave = f.Stave({ x: 10, y: 10, width: 350 }).addClef('treble').addTimeSignature('4/4');
 
@@ -1488,5 +1566,8 @@ describe('StaveNote', () => {
     f.draw();
 
     assert.ok(true);
+
+    await expectMatchingScreenshot(options, 'stavenote_tests.test.ts');
+
   });
 });

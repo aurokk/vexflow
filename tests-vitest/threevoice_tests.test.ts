@@ -12,13 +12,13 @@ import { Flow } from '../src/flow';
 import { Note } from '../src/note';
 import { ContextBuilder, Renderer } from '../src/renderer';
 import { Voice } from '../src/voice';
-import { concat, createAssert, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
+import { concat, createAssert, expectMatchingScreenshot, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
 
 describe('Three Voice Rests', () => {
   // Helper function to run a test with multiple backends and font stacks
-  function runTest(
+  async function runTest(
     testName: string,
-    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void | Promise<void>,
     backends: Array<{ backend: number; fontStacks: string[] }> = [
       { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
       { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
@@ -26,7 +26,7 @@ describe('Three Voice Rests', () => {
   ) {
     backends.forEach(({ backend, fontStacks }) => {
       fontStacks.forEach((fontStackName) => {
-        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, async () => {
           const elementId = generateTestID('threevoice_test');
 
           // Create the DOM element before the test runs
@@ -35,7 +35,7 @@ describe('Three Voice Rests', () => {
           element.id = elementId;
           document.body.appendChild(element);
 
-          const options: TestOptions = { elementId, params: {}, backend };
+          const options: TestOptions = { elementId, params: {}, backend, testName, fontStackName };
 
           // Set font stack
           const originalFontNames = Flow.getMusicFont();
@@ -44,7 +44,7 @@ describe('Three Voice Rests', () => {
           try {
             const contextBuilder: ContextBuilder =
               backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
-            testFunc(options, contextBuilder);
+            await testFunc(options, contextBuilder);
           } finally {
             // Restore original font
             Flow.setMusicFont(...originalFontNames);
@@ -65,9 +65,9 @@ describe('Three Voice Rests', () => {
     noteGroup3: [string, BuilderOptions],
     setup: (f: Factory, v: Voice[]) => void
   ) {
-    return (options: TestOptions, contextBuilder: ContextBuilder) => {
+    return async (options: TestOptions, contextBuilder: ContextBuilder) => {
       const assert = createAssert();
-      const f = makeFactory(options.backend, options.elementId, 600, 200);
+      const f = makeFactory(options.backend, options.elementId, 600, 200, options);
       const stave = f.Stave().addClef('treble').addTimeSignature('4/4');
       const score = f.EasyScore();
 
@@ -92,6 +92,8 @@ describe('Three Voice Rests', () => {
       for (let i = 0; i < beams.length; i++) {
         beams[i].setContext(f.getContext()).draw();
       }
+
+      await expectMatchingScreenshot(options, 'threevoice_tests.test.ts');
 
       assert.ok(true);
     };
@@ -153,9 +155,9 @@ describe('Three Voice Rests', () => {
     )
   );
 
-  runTest('Auto Adjust Rest Positions - Two Voices', (options: TestOptions) => {
+  runTest('Auto Adjust Rest Positions - Two Voices', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 900, 200);
+    const f = makeFactory(options.backend, options.elementId, 900, 200, options);
     const score = f.EasyScore();
     let x = 10;
 
@@ -189,12 +191,14 @@ describe('Three Voice Rests', () => {
       beams[i].setContext(f.getContext()).draw();
     }
 
+    await expectMatchingScreenshot(options, 'threevoice_tests.test.ts');
+
     assert.ok(true, 'Auto Adjust Rests - Two Voices');
   });
 
-  runTest('Auto Adjust Rest Positions - Three Voices #1', (options: TestOptions) => {
+  runTest('Auto Adjust Rest Positions - Three Voices #1', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 850, 200);
+    const f = makeFactory(options.backend, options.elementId, 850, 200, options);
     const score = f.EasyScore();
     let x = 10;
 
@@ -223,12 +227,14 @@ describe('Three Voice Rests', () => {
     createMeasure('Rests Repositioned To Avoid Collisions', 400, true);
     f.draw();
 
+    await expectMatchingScreenshot(options, 'threevoice_tests.test.ts');
+
     assert.ok(true);
   });
 
-  runTest('Auto Adjust Rest Positions - Three Voices #2', (options: TestOptions) => {
+  runTest('Auto Adjust Rest Positions - Three Voices #2', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 850, 200);
+    const f = makeFactory(options.backend, options.elementId, 850, 200, options);
     const score = f.EasyScore();
     let x = 10;
 
@@ -250,6 +256,8 @@ describe('Three Voice Rests', () => {
     createMeasure('Default Rest Positions', 400, false);
     createMeasure('Rests Repositioned To Avoid Collisions', 400, true);
     f.draw();
+
+    await expectMatchingScreenshot(options, 'threevoice_tests.test.ts');
 
     assert.ok(true);
   });

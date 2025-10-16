@@ -11,13 +11,13 @@ import { ContextBuilder, Renderer } from '../src/renderer';
 import { Stave } from '../src/stave';
 import { BarlineType } from '../src/stavebarline';
 import { Stroke } from '../src/strokes';
-import { createAssert, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
+import { createAssert, expectMatchingScreenshot, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
 
 describe('StringNumber', () => {
   // Helper function to run a test with multiple backends and font stacks
-  function runTest(
+  async function runTest(
     testName: string,
-    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void | Promise<void>,
     backends: Array<{ backend: number; fontStacks: string[] }> = [
       { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
       { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
@@ -25,7 +25,7 @@ describe('StringNumber', () => {
   ) {
     backends.forEach(({ backend, fontStacks }) => {
       fontStacks.forEach((fontStackName) => {
-        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, async () => {
           const elementId = generateTestID('stringnumber_test');
 
           // Create the DOM element before the test runs
@@ -35,7 +35,7 @@ describe('StringNumber', () => {
           document.body.appendChild(element);
 
           const assert = createAssert();
-          const options: TestOptions = { elementId, params: {}, backend };
+          const options: TestOptions = { elementId, params: {}, backend, testName, fontStackName };
 
           // Set font stack
           const originalFontNames = Flow.getMusicFont();
@@ -44,7 +44,7 @@ describe('StringNumber', () => {
           try {
             const contextBuilder: ContextBuilder =
               backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
-            testFunc(options, contextBuilder);
+            await testFunc(options, contextBuilder);
           } finally {
             // Restore original font
             Flow.setMusicFont(...originalFontNames);
@@ -56,9 +56,9 @@ describe('StringNumber', () => {
     });
   }
 
-  runTest('String Number In Notation', (options: TestOptions) => {
+  runTest('String Number In Notation', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 775, 200);
+    const f = makeFactory(options.backend, options.elementId, 775, 200, options);
     const score = f.EasyScore();
 
     // bar 1
@@ -147,12 +147,13 @@ describe('StringNumber', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'stringnumber_tests.test.ts');
     assert.ok(true, 'String Number');
   });
 
-  runTest('String Number In Notation - no circle', (options: TestOptions) => {
+  runTest('String Number In Notation - no circle', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 775, 200);
+    const f = makeFactory(options.backend, options.elementId, 775, 200, options);
     const score = f.EasyScore();
 
     // bar 1
@@ -244,12 +245,13 @@ describe('StringNumber', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'stringnumber_tests.test.ts');
     assert.ok(true, 'String Number');
   });
 
-  runTest('Fret Hand Finger In Notation', (options: TestOptions) => {
+  runTest('Fret Hand Finger In Notation', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 725, 200);
+    const f = makeFactory(options.backend, options.elementId, 725, 200, options);
     const score = f.EasyScore();
 
     // bar 1
@@ -331,12 +333,13 @@ describe('StringNumber', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'stringnumber_tests.test.ts');
     assert.ok(true, 'String Number');
   });
 
-  runTest('Multi Voice With Strokes, String & Finger Numbers', (options: TestOptions) => {
+  runTest('Multi Voice With Strokes, String & Finger Numbers', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 700, 200);
+    const f = makeFactory(options.backend, options.elementId, 700, 200, options);
     const score = f.EasyScore();
     const stave = f.Stave();
 
@@ -395,12 +398,13 @@ describe('StringNumber', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'stringnumber_tests.test.ts');
     assert.ok(true, 'Strokes Test Multi Voice');
   });
 
-  runTest('Complex Measure With String & Finger Numbers', (options: TestOptions) => {
+  runTest('Complex Measure With String & Finger Numbers', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 750);
+    const f = makeFactory(options.backend, options.elementId, 750, undefined, options);
     const glyphScale = 39; // default font scale
     const clefWidth = Glyph.getWidth('gClef', glyphScale); // widest clef
 
@@ -473,12 +477,13 @@ describe('StringNumber', () => {
       .addClef('treble')
       .draw();
     voice.draw(ctx, stave);
+    await expectMatchingScreenshot(options, 'stringnumber_tests.test.ts');
     assert.ok(true, 'String Number');
   });
 
-  runTest('Shifted Notehead, Multiple Modifiers', (options: TestOptions) => {
+  runTest('Shifted Notehead, Multiple Modifiers', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 900, 150);
+    const f = makeFactory(options.backend, options.elementId, 900, 150, options);
     const score = f.EasyScore();
     score.set({ time: '6/4' });
 
@@ -499,6 +504,7 @@ describe('StringNumber', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'stringnumber_tests.test.ts');
     assert.ok(true, 'String Number');
   });
 });

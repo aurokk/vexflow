@@ -21,7 +21,14 @@ import { Stroke } from '../src/strokes';
 import { TabNote, TabNoteStruct } from '../src/tabnote';
 import { TabStave } from '../src/tabstave';
 import { TimeSignature } from '../src/timesignature';
-import { createAssert, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
+import {
+  createAssert,
+  expectMatchingScreenshot,
+  FONT_STACKS,
+  generateTestID,
+  makeFactory,
+  TestOptions,
+} from './vitest_test_helpers';
 
 /**
  * Helper function to create a ElementStyle options object of the form { fillStyle: XXX, strokeStyle: YYY }.
@@ -37,9 +44,9 @@ function FS(fillStyle: string, strokeStyle?: string): ElementStyle {
 
 describe('Style', () => {
   // Helper function to run a test with multiple backends and font stacks
-  function runTest(
+  async function runTest(
     testName: string,
-    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void | Promise<void>,
     backends: Array<{ backend: number; fontStacks: string[] }> = [
       { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
       { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
@@ -47,7 +54,7 @@ describe('Style', () => {
   ) {
     backends.forEach(({ backend, fontStacks }) => {
       fontStacks.forEach((fontStackName) => {
-        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, async () => {
           const elementId = generateTestID('style_test');
 
           // Create the DOM element before the test runs
@@ -56,7 +63,7 @@ describe('Style', () => {
           element.id = elementId;
           document.body.appendChild(element);
 
-          const options: TestOptions = { elementId, params: {}, backend };
+          const options: TestOptions = { elementId, params: {}, backend, testName, fontStackName };
 
           // Set font stack
           const originalFontNames = Flow.getMusicFont();
@@ -65,7 +72,7 @@ describe('Style', () => {
           try {
             const contextBuilder: ContextBuilder =
               backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
-            testFunc(options, contextBuilder);
+            await testFunc(options, contextBuilder);
           } finally {
             // Restore original font
             Flow.setMusicFont(...originalFontNames);
@@ -77,9 +84,9 @@ describe('Style', () => {
     });
   }
 
-  runTest('Basic Style', (options: TestOptions) => {
+  runTest('Basic Style', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 600, 150);
+    const f = makeFactory(options.backend, options.elementId, 600, 150, options);
     const stave = f.Stave({ x: 25, y: 20, width: 500 });
 
     // Stave modifiers test.
@@ -129,12 +136,15 @@ describe('Style', () => {
     f.Formatter().joinVoices([voice]).formatToStave([voice], stave);
 
     f.draw();
+    await expectMatchingScreenshot(options, 'style_tests.test.ts');
     assert.ok(true, 'Basic Style');
   });
 
-  runTest('TabNote modifiers Style', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('TabNote modifiers Style', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const ctx = contextBuilder(options.elementId, 500, 140);
+    options.width = 500;
+    options.height = 140;
 
     ctx.font = '10pt Arial';
     const stave = new TabStave(10, 10, 450).addTabGlyph();
@@ -163,6 +173,7 @@ describe('Style', () => {
     ];
 
     Formatter.FormatAndDraw(ctx, stave, notes);
+    await expectMatchingScreenshot(options, 'style_tests.test.ts');
     assert.ok(true, 'TabNote Modifiers Style');
   });
 });

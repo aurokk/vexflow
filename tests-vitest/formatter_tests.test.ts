@@ -30,7 +30,7 @@ import { Tables } from '../src/tables';
 import { Tuplet } from '../src/tuplet';
 import { Voice, VoiceTime } from '../src/voice';
 import { MockTickable } from './mocks';
-import { createAssert, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
+import { createAssert, expectMatchingScreenshot, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
 
 /** Calculate the glyph's width in the current music font. */
 // How is this different from Glyph.getWidth()? The numbers don't match up.
@@ -60,9 +60,9 @@ describe('Formatter', () => {
   });
 
   // Helper function to run a test with multiple backends and font stacks
-  function runTest(
+  async function runTest(
     testName: string,
-    testFunc: (options: TestOptions) => void,
+    testFunc: (options: TestOptions) => void | Promise<void>,
     backends: Array<{ backend: number; fontStacks: string[] }> = [
       { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
       { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
@@ -70,7 +70,7 @@ describe('Formatter', () => {
   ) {
     backends.forEach(({ backend, fontStacks }) => {
       fontStacks.forEach((fontStackName) => {
-        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, async () => {
           const elementId = generateTestID('formatter_test');
 
           // Create the DOM element before the test runs
@@ -79,14 +79,14 @@ describe('Formatter', () => {
           element.id = elementId;
           document.body.appendChild(element);
 
-          const options: TestOptions = { elementId, params: {}, backend };
+          const options: TestOptions = { elementId, params: {}, backend, testName, fontStackName };
 
           // Set font stack
           const originalFontNames = Flow.getMusicFont();
           Flow.setMusicFont(...FONT_STACKS[fontStackName]);
 
           try {
-            testFunc(options);
+            await testFunc(options);
           } finally {
             // Restore original font
             Flow.setMusicFont(...originalFontNames);
@@ -145,9 +145,9 @@ describe('Formatter', () => {
     );
   });
 
-  runTest('Penultimate Note Padding', (options: TestOptions) => {
+  runTest('Penultimate Note Padding', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 500, 550);
+    const f = makeFactory(options.backend, options.elementId, 500, 550, options);
     const score = f.EasyScore();
     const staffWidth = 310;
     let system: System | undefined = undefined;
@@ -192,12 +192,13 @@ describe('Formatter', () => {
     draw(5);
     draw(2);
     draw(1);
+    await expectMatchingScreenshot(options, 'formatter_tests.test.ts');
     assert.ok(true);
   });
 
-  runTest('Whitespace and justify', (options: TestOptions) => {
+  runTest('Whitespace and justify', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 1200, 150);
+    const f = makeFactory(options.backend, options.elementId, 1200, 150, options);
     const getTickables = (time: VoiceTime, n: number, duration: string, duration2: string): Voice => {
       const tickar: StaveNote[] = [];
       let i = 0;
@@ -222,14 +223,15 @@ describe('Formatter', () => {
     renderTest({ num_beats: 4, beat_value: 4, resolution: 4 * 4096 }, 1, 'w', 'w', 310, 300);
     renderTest({ num_beats: 3, beat_value: 4, resolution: 4 * 4096 }, 3, '4', '4', 610, 300);
     renderTest({ num_beats: 3, beat_value: 4, resolution: 4 * 4096 }, 6, '8', '8', 910, 300);
+    await expectMatchingScreenshot(options, 'formatter_tests.test.ts');
     assert.ok(true);
   });
 
-  runTest('Notehead padding', (options: TestOptions) => {
+  runTest('Notehead padding', async (options: TestOptions) => {
     const assert = createAssert();
     const registry = new Registry();
     Registry.enableDefaultRegistry(registry);
-    const f = makeFactory(options.backend, options.elementId, 600, 300);
+    const f = makeFactory(options.backend, options.elementId, 600, 300, options);
     const score = f.EasyScore();
     score.set({ time: '9/8' });
 
@@ -253,12 +255,13 @@ describe('Formatter', () => {
     voice1.draw(f.getContext(), stave1);
     voice2.draw(f.getContext(), stave2);
     beams.forEach((b) => b.setContext(f.getContext()).draw());
+    await expectMatchingScreenshot(options, 'formatter_tests.test.ts');
     assert.ok(true);
   });
 
-  runTest('Justification and alignment with accidentals', (options: TestOptions) => {
+  runTest('Justification and alignment with accidentals', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 600, 300);
+    const f = makeFactory(options.backend, options.elementId, 600, 300, options);
     const score = f.EasyScore();
 
     const notes11 = score.notes('a4/2, a4/4, a4/8, ab4/16, an4/16');
@@ -282,14 +285,15 @@ describe('Formatter', () => {
     voice11.draw(ctx, stave11);
     voice21.draw(ctx, stave21);
     beams.forEach((b) => b.setContext(ctx).draw());
+    await expectMatchingScreenshot(options, 'formatter_tests.test.ts');
     assert.ok(true);
   });
 
-  runTest('Long measure taking full space', (options: TestOptions) => {
+  runTest('Long measure taking full space', async (options: TestOptions) => {
     const assert = createAssert();
     const registry = new Registry();
     Registry.enableDefaultRegistry(registry);
-    const f = makeFactory(options.backend, options.elementId, 1500, 300);
+    const f = makeFactory(options.backend, options.elementId, 1500, 300, options);
     const score = f.EasyScore();
     score.set({ time: '4/4' });
     const notes1 = score.notes(
@@ -312,12 +316,13 @@ describe('Formatter', () => {
     stave2.draw();
     voice1.draw(f.getContext(), stave1);
     voice2.draw(f.getContext(), stave2);
+    await expectMatchingScreenshot(options, 'formatter_tests.test.ts');
     assert.ok(true);
   });
 
-  runTest('Vertical alignment - few unaligned beats', (options: TestOptions) => {
+  runTest('Vertical alignment - few unaligned beats', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 600, 250);
+    const f = makeFactory(options.backend, options.elementId, 600, 250, options);
     const score = f.EasyScore();
 
     const notes11 = [
@@ -353,10 +358,11 @@ describe('Formatter', () => {
     beams21.forEach((b) => b.setContext(ctx).draw());
     beams11.forEach((b) => b.setContext(ctx).draw());
 
+    await expectMatchingScreenshot(options, 'formatter_tests.test.ts');
     assert.ok(voice11.getTickables()[1].getX() > voice21.getTickables()[1].getX());
   });
 
-  runTest('Vertical alignment - many unaligned beats', (options: TestOptions) => {
+  runTest('Vertical alignment - many unaligned beats', async (options: TestOptions) => {
     const assert = createAssert();
     const notes1 = [
       new StaveNote({ keys: ['b/4'], duration: '8r' }),
@@ -384,7 +390,7 @@ describe('Formatter', () => {
       new StaveNote({ keys: ['e/4'], duration: '4' }),
     ];
 
-    const f = makeFactory(options.backend, options.elementId, 750, 280);
+    const f = makeFactory(options.backend, options.elementId, 750, 280, options);
     const context = f.getContext();
     const voice1 = new Voice({ num_beats: 4, beat_value: 4 });
     voice1.addTickables(notes1);
@@ -404,10 +410,11 @@ describe('Formatter', () => {
     voice1.draw(context, stave1);
     voice2.draw(context, stave2);
 
+    await expectMatchingScreenshot(options, 'formatter_tests.test.ts');
     assert.ok(voice1.getTickables()[1].getX() > voice2.getTickables()[1].getX());
   });
 
-  runTest('Vertical alignment - many unaligned beats (global softmax)', (options: TestOptions) => {
+  runTest('Vertical alignment - many unaligned beats (global softmax)', async (options: TestOptions) => {
     const assert = createAssert();
     const notes1 = [
       new StaveNote({ keys: ['b/4'], duration: '8r' }),
@@ -435,7 +442,7 @@ describe('Formatter', () => {
       new StaveNote({ keys: ['e/4'], duration: '4' }),
     ];
 
-    const f = makeFactory(options.backend, options.elementId, 750, 280);
+    const f = makeFactory(options.backend, options.elementId, 750, 280, options);
     const context = f.getContext();
     const voice1 = new Voice({ num_beats: 4, beat_value: 4 });
     voice1.addTickables(notes1);
@@ -455,12 +462,13 @@ describe('Formatter', () => {
     voice1.draw(context, stave1);
     voice2.draw(context, stave2);
 
+    await expectMatchingScreenshot(options, 'formatter_tests.test.ts');
     assert.ok(voice1.getTickables()[1].getX() > voice2.getTickables()[1].getX());
   });
 
-  runTest('Vertical alignment - many mixed elements', (options: TestOptions) => {
+  runTest('Vertical alignment - many mixed elements', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 800, 500);
+    const f = makeFactory(options.backend, options.elementId, 800, 500, options);
     const context = f.getContext();
     const stave = new Stave(10, 200, 400);
     const stave2 = new Stave(410, 200, 400);
@@ -525,12 +533,13 @@ describe('Formatter', () => {
     tuplet.setContext(context).draw();
     tuplet2.setContext(context).draw();
 
+    await expectMatchingScreenshot(options, 'formatter_tests.test.ts');
     assert.ok(true);
   });
 
-  runTest('StaveNote - Justification', (options: TestOptions) => {
+  runTest('StaveNote - Justification', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 520, 280);
+    const f = makeFactory(options.backend, options.elementId, 520, 280, options);
     const ctx = f.getContext();
     const score = f.EasyScore();
 
@@ -558,12 +567,13 @@ describe('Formatter', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'formatter_tests.test.ts');
     assert.ok(true);
   });
 
-  runTest('Notes with Tab', (options: TestOptions) => {
+  runTest('Notes with Tab', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 420, 580);
+    const f = makeFactory(options.backend, options.elementId, 420, 580, options);
     const score = f.EasyScore();
 
     let y = 10;
@@ -608,12 +618,13 @@ describe('Formatter', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'formatter_tests.test.ts');
     assert.ok(true);
   });
 
-  runTest('Multiple Staves - Justified', (options: TestOptions) => {
+  runTest('Multiple Staves - Justified', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 600, 400);
+    const f = makeFactory(options.backend, options.elementId, 600, 400, options);
     const ctx = f.getContext();
     const score = f.EasyScore();
 
@@ -694,12 +705,13 @@ describe('Formatter', () => {
       voices[i].getTickables().forEach((note) => Note.plotMetrics(ctx, note, staveYs[i] - 20));
     }
     beams.forEach((beam) => beam.setContext(ctx).draw());
+    await expectMatchingScreenshot(options, 'formatter_tests.test.ts');
     assert.ok(true);
   });
 
-  runTest('Softmax', (options: TestOptions) => {
+  runTest('Softmax', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 550, 500);
+    const f = makeFactory(options.backend, options.elementId, 550, 500, options);
     const textX = 450 / 0.8;
     f.getContext().scale(0.8, 0.8);
 
@@ -737,11 +749,12 @@ describe('Formatter', () => {
     draw(250, 5);
     draw(350, 10);
     draw(450, 15);
+    await expectMatchingScreenshot(options, 'formatter_tests.test.ts');
   });
 
-  runTest('Mixtime', (options: TestOptions) => {
+  runTest('Mixtime', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 400 + Stave.defaultPadding, 250);
+    const f = makeFactory(options.backend, options.elementId, 400 + Stave.defaultPadding, 250, options);
     f.getContext().scale(0.8, 0.8);
     const score = f.EasyScore();
     const system = f.System({
@@ -767,12 +780,13 @@ describe('Formatter', () => {
       .addTimeSignature('4/4');
 
     f.draw();
+    await expectMatchingScreenshot(options, 'formatter_tests.test.ts');
     assert.ok(true);
   });
 
-  runTest('Tight', (options: TestOptions) => {
+  runTest('Tight', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 440, 250);
+    const f = makeFactory(options.backend, options.elementId, 440, 250, options);
     f.getContext().scale(0.8, 0.8);
     const score = f.EasyScore();
     const system = f.System({
@@ -800,12 +814,13 @@ describe('Formatter', () => {
       .addTimeSignature('4/4');
 
     f.draw();
+    await expectMatchingScreenshot(options, 'formatter_tests.test.ts');
     assert.ok(true);
   });
 
-  runTest('Tight 2', (options: TestOptions) => {
+  runTest('Tight 2', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 440, 250);
+    const f = makeFactory(options.backend, options.elementId, 440, 250, options);
     f.getContext().scale(0.8, 0.8);
     const score = f.EasyScore();
     const system = f.System({
@@ -830,14 +845,15 @@ describe('Formatter', () => {
       .addTimeSignature('4/4');
 
     f.draw();
+    await expectMatchingScreenshot(options, 'formatter_tests.test.ts');
     assert.ok(true);
   });
 
-  runTest('Annotations', (options: TestOptions) => {
+  runTest('Annotations', async (options: TestOptions) => {
     const assert = createAssert();
     const pageWidth = 916;
     const pageHeight = 600;
-    const f = makeFactory(options.backend, options.elementId, pageWidth, pageHeight);
+    const f = makeFactory(options.backend, options.elementId, pageWidth, pageHeight, options);
     const context = f.getContext();
 
     const lyrics1 = ['ipso', 'ipso-', 'ipso', 'ipso', 'ipsoz', 'ipso-', 'ipso', 'ipso', 'ipso', 'ip', 'ipso'];
@@ -933,15 +949,16 @@ describe('Formatter', () => {
       beams.forEach((b) => b.setContext(context).draw());
     });
 
+    await expectMatchingScreenshot(options, 'formatter_tests.test.ts');
     assert.ok(true);
   });
 
-  runTest('Proportional Formatting - No Tuning', (options: TestOptions) => {
+  runTest('Proportional Formatting - No Tuning', async (options: TestOptions) => {
     const assert = createAssert();
     const debug = true;
     Registry.enableDefaultRegistry(new Registry());
 
-    const f = makeFactory(options.backend, options.elementId, 775, 750);
+    const f = makeFactory(options.backend, options.elementId, 775, 750, options);
     const system = f.System({
       x: 50,
       autoWidth: true,
@@ -973,15 +990,16 @@ describe('Formatter', () => {
     f.draw();
 
     Registry.disableDefaultRegistry();
+    await expectMatchingScreenshot(options, 'formatter_tests.test.ts');
     assert.ok(true);
   });
 
-  runTest('Proportional Formatting - No Justification', (options: TestOptions) => {
+  runTest('Proportional Formatting - No Justification', async (options: TestOptions) => {
     const assert = createAssert();
     const debug = true;
     Registry.enableDefaultRegistry(new Registry());
 
-    const f = makeFactory(options.backend, options.elementId, 775, 750);
+    const f = makeFactory(options.backend, options.elementId, 775, 750, options);
     const system = f.System({
       x: 50,
       autoWidth: true,
@@ -1013,15 +1031,16 @@ describe('Formatter', () => {
     f.draw();
 
     Registry.disableDefaultRegistry();
+    await expectMatchingScreenshot(options, 'formatter_tests.test.ts');
     assert.ok(true);
   });
 
-  runTest('Proportional Formatting (20 iterations)', (options: TestOptions) => {
+  runTest('Proportional Formatting (20 iterations)', async (options: TestOptions) => {
     const assert = createAssert();
     const debug = true;
     Registry.enableDefaultRegistry(new Registry());
 
-    const f = makeFactory(options.backend, options.elementId, 775, 750);
+    const f = makeFactory(options.backend, options.elementId, 775, 750, options);
     const system = f.System({
       x: 50,
       autoWidth: true,
@@ -1053,6 +1072,7 @@ describe('Formatter', () => {
     f.draw();
 
     Registry.disableDefaultRegistry();
+    await expectMatchingScreenshot(options, 'formatter_tests.test.ts');
     assert.ok(true);
   });
 });

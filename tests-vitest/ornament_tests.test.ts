@@ -18,13 +18,20 @@ import { ContextBuilder, Renderer } from '../src/renderer';
 import { Stave } from '../src/stave';
 import { StaveNote } from '../src/stavenote';
 import { Voice, VoiceMode } from '../src/voice';
-import { createAssert, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
+import {
+  createAssert,
+  expectMatchingScreenshot,
+  FONT_STACKS,
+  generateTestID,
+  makeFactory,
+  TestOptions,
+} from './vitest_test_helpers';
 
 describe('Ornament', () => {
   // Helper function to run a test with multiple backends and font stacks
-  function runTest(
+  async function runTest(
     testName: string,
-    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void | Promise<void>,
     backends: Array<{ backend: number; fontStacks: string[] }> = [
       { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
       { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
@@ -32,7 +39,7 @@ describe('Ornament', () => {
   ) {
     backends.forEach(({ backend, fontStacks }) => {
       fontStacks.forEach((fontStackName) => {
-        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, async () => {
           const elementId = generateTestID('ornament_test');
 
           // Create the DOM element before the test runs
@@ -41,8 +48,13 @@ describe('Ornament', () => {
           element.id = elementId;
           document.body.appendChild(element);
 
-          const assert = createAssert();
-          const options: TestOptions = { elementId, params: {}, backend };
+          const options: TestOptions = {
+            elementId,
+            params: {},
+            backend,
+            testName,
+            fontStackName,
+          };
 
           // Set font stack
           const originalFontNames = Flow.getMusicFont();
@@ -51,7 +63,7 @@ describe('Ornament', () => {
           try {
             const contextBuilder: ContextBuilder =
               backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
-            testFunc(options, contextBuilder);
+            await testFunc(options, contextBuilder);
           } finally {
             // Restore original font
             Flow.setMusicFont(...originalFontNames);
@@ -63,7 +75,7 @@ describe('Ornament', () => {
     });
   }
 
-  runTest('Ornaments', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Ornaments', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const ctx = contextBuilder(options.elementId, 750, 195);
 
@@ -101,10 +113,13 @@ describe('Ornament', () => {
 
     // Helper function to justify and draw a 4/4 voice
     Formatter.FormatAndDraw(ctx, stave, notes);
+
+    await expectMatchingScreenshot(options, 'ornament_tests.test.ts');
+
     assert.ok(true);
   });
 
-  runTest('Ornaments Vertically Shifted', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Ornaments Vertically Shifted', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const ctx = contextBuilder(options.elementId, 750, 195);
 
@@ -143,6 +158,9 @@ describe('Ornament', () => {
 
     // Helper function to justify and draw a 4/4 voice
     Formatter.FormatAndDraw(ctx, stave, notes);
+
+    await expectMatchingScreenshot(options, 'ornament_tests.test.ts');
+
     assert.ok(true);
   });
 
@@ -172,19 +190,22 @@ describe('Ornament', () => {
     return { context, stave, notes };
   };
 
-  runTest('Ornaments - Delayed turns', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Ornaments - Delayed turns', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 550, 195);
+    const f = makeFactory(options.backend, options.elementId, 550, 195, options);
     const { context, stave, notes } = addDelayedTurns(f);
 
     // Helper function to justify and draw a 4/4 voice
     Formatter.FormatAndDraw(context, stave, notes);
+
+    await expectMatchingScreenshot(options, 'ornament_tests.test.ts');
+
     assert.ok(true);
   });
 
-  runTest('Ornaments - Delayed turns, Multiple Draws', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Ornaments - Delayed turns, Multiple Draws', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 550, 195);
+    const f = makeFactory(options.backend, options.elementId, 550, 195, options);
 
     const { context, stave, notes } = addDelayedTurns(f);
 
@@ -192,10 +213,13 @@ describe('Ornament', () => {
     // However, if you inspect the SVG element, you will see duplicate paths.
     Formatter.FormatAndDraw(context, stave, notes);
     Formatter.FormatAndDraw(context, stave, notes);
+
+    await expectMatchingScreenshot(options, 'ornament_tests.test.ts');
+
     assert.ok(true);
   });
 
-  runTest('Ornaments - Delayed turns, Multiple Voices', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Ornaments - Delayed turns, Multiple Voices', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const ctx = contextBuilder(options.elementId, 550, 195);
 
@@ -232,12 +256,14 @@ describe('Ornament', () => {
     voice1.draw(ctx, stave);
     voice2.draw(ctx, stave);
 
+    await expectMatchingScreenshot(options, 'ornament_tests.test.ts');
+
     assert.ok(true);
   });
 
-  runTest('Stacked', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Stacked', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 550, 195);
+    const f = makeFactory(options.backend, options.elementId, 550, 195, options);
     const ctx = f.getContext();
 
     const stave = f.Stave({ x: 10, y: 30, width: 500 });
@@ -261,12 +287,15 @@ describe('Ornament', () => {
 
     // Helper function to justify and draw a 4/4 voice
     Formatter.FormatAndDraw(ctx, stave, notes);
+
+    await expectMatchingScreenshot(options, 'ornament_tests.test.ts');
+
     assert.ok(true);
   });
 
-  runTest('With Upper/Lower Accidentals', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('With Upper/Lower Accidentals', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 650, 250);
+    const f = makeFactory(options.backend, options.elementId, 650, 250, options);
     const ctx = f.getContext();
 
     const stave = f.Stave({ x: 10, y: 60, width: 600 });
@@ -299,14 +328,17 @@ describe('Ornament', () => {
 
     // Helper function to justify and draw a 4/4 voice
     Formatter.FormatAndDraw(ctx, stave, notes);
+
+    await expectMatchingScreenshot(options, 'ornament_tests.test.ts');
+
     assert.ok(true);
   });
 
-  runTest('Jazz Ornaments', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Jazz Ornaments', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const clefWidth = Glyph.getWidth('gClef', 38); // widest clef
 
-    const f = makeFactory(options.backend, options.elementId, 950, 400);
+    const f = makeFactory(options.backend, options.elementId, 950, 400, options);
     const ctx = f.getContext();
     ctx.scale(1, 1);
 
@@ -457,6 +489,8 @@ describe('Ornament', () => {
       f.Ornament('doit'),
     ];
     draw(mods, ['e/4'], curX, width, curY);
+
+    await expectMatchingScreenshot(options, 'ornament_tests.test.ts');
 
     assert.ok(true);
   });

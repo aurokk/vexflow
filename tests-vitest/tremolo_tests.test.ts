@@ -9,13 +9,20 @@ import { Flow } from '../src/flow';
 import { ContextBuilder, Renderer } from '../src/renderer';
 import { Barline } from '../src/stavebarline';
 import { Tremolo } from '../src/tremolo';
-import { createAssert, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
+import {
+  createAssert,
+  expectMatchingScreenshot,
+  FONT_STACKS,
+  generateTestID,
+  makeFactory,
+  TestOptions,
+} from './vitest_test_helpers';
 
 describe('Tremolo', () => {
   // Helper function to run a test with multiple backends and font stacks
-  function runTest(
+  async function runTest(
     testName: string,
-    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void | Promise<void>,
     backends: Array<{ backend: number; fontStacks: string[] }> = [
       { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
       { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
@@ -23,7 +30,7 @@ describe('Tremolo', () => {
   ) {
     backends.forEach(({ backend, fontStacks }) => {
       fontStacks.forEach((fontStackName) => {
-        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, async () => {
           const elementId = generateTestID('tremolo_test');
 
           // Create the DOM element before the test runs
@@ -32,7 +39,7 @@ describe('Tremolo', () => {
           element.id = elementId;
           document.body.appendChild(element);
 
-          const options: TestOptions = { elementId, params: {}, backend };
+          const options: TestOptions = { elementId, params: {}, backend, testName, fontStackName };
 
           // Set font stack
           const originalFontNames = Flow.getMusicFont();
@@ -41,7 +48,7 @@ describe('Tremolo', () => {
           try {
             const contextBuilder: ContextBuilder =
               backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
-            testFunc(options, contextBuilder);
+            await testFunc(options, contextBuilder);
           } finally {
             // Restore original font
             Flow.setMusicFont(...originalFontNames);
@@ -53,9 +60,9 @@ describe('Tremolo', () => {
     });
   }
 
-  runTest('Tremolo - Basic', (options: TestOptions) => {
+  runTest('Tremolo - Basic', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 600, 200);
+    const f = makeFactory(options.backend, options.elementId, 600, 200, options);
     const score = f.EasyScore();
 
     // bar 1
@@ -88,12 +95,13 @@ describe('Tremolo', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'tremolo_tests.test.ts');
     assert.ok(true, 'Tremolo - Basic');
   });
 
-  runTest('Tremolo - Big', (options: TestOptions) => {
+  runTest('Tremolo - Big', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 600, 200);
+    const f = makeFactory(options.backend, options.elementId, 600, 200, options);
     const score = f.EasyScore();
 
     // bar 1
@@ -144,6 +152,7 @@ describe('Tremolo', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'tremolo_tests.test.ts');
     assert.ok(true, 'Tremolo - Big');
   });
 });

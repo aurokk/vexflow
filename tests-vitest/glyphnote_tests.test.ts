@@ -13,13 +13,20 @@ import { Registry } from '../src/registry';
 import { ContextBuilder, Renderer } from '../src/renderer';
 import { StaveConnector } from '../src/staveconnector';
 import { Voice } from '../src/voice';
-import { createAssert, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
+import {
+  createAssert,
+  expectMatchingScreenshot,
+  FONT_STACKS,
+  generateTestID,
+  makeFactory,
+  TestOptions,
+} from './vitest_test_helpers';
 
 describe('GlyphNote', () => {
   // Helper function to run a test with multiple backends and font stacks
-  function runTest(
+  async function runTest(
     testName: string,
-    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void | Promise<void>,
     backends: Array<{ backend: number; fontStacks: string[] }> = [
       { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
       { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
@@ -27,7 +34,7 @@ describe('GlyphNote', () => {
   ) {
     backends.forEach(({ backend, fontStacks }) => {
       fontStacks.forEach((fontStackName) => {
-        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, async () => {
           const elementId = generateTestID('glyphnote_test');
 
           // Create the DOM element before the test runs
@@ -37,7 +44,13 @@ describe('GlyphNote', () => {
           document.body.appendChild(element);
 
           const assert = createAssert();
-          const options: TestOptions = { elementId, params: {}, backend };
+          const options: TestOptions = {
+            elementId,
+            params: {},
+            backend,
+            testName,
+            fontStackName,
+          };
 
           // Set font stack
           const originalFontNames = Flow.getMusicFont();
@@ -46,7 +59,7 @@ describe('GlyphNote', () => {
           try {
             const contextBuilder: ContextBuilder =
               backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
-            testFunc(options, contextBuilder);
+            await testFunc(options, contextBuilder);
           } finally {
             // Restore original font
             Flow.setMusicFont(...originalFontNames);
@@ -58,11 +71,11 @@ describe('GlyphNote', () => {
     });
   }
 
-  runTest('GlyphNote with ChordSymbols', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('GlyphNote with ChordSymbols', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     Registry.enableDefaultRegistry(new Registry());
 
-    const f = makeFactory(options.backend, options.elementId, 300, 200);
+    const f = makeFactory(options.backend, options.elementId, 300, 200, options);
     const system = f.System({
       x: 50,
       width: 250,
@@ -97,15 +110,18 @@ describe('GlyphNote', () => {
     system.addStave({ voices: [voice], debugNoteMetrics: false });
     system.addConnector().setType(StaveConnector.type.BRACKET);
     f.draw();
+
+    await expectMatchingScreenshot(options, 'glyphnote_tests.test.ts');
+
     Registry.disableDefaultRegistry();
     assert.ok(true);
   });
 
-  runTest('GlyphNote Positioning', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('GlyphNote Positioning', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     Registry.enableDefaultRegistry(new Registry());
 
-    const f = makeFactory(options.backend, options.elementId, 300, 400);
+    const f = makeFactory(options.backend, options.elementId, 300, 400, options);
     const system = f.System({
       x: 50,
       width: 250,
@@ -136,15 +152,17 @@ describe('GlyphNote', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'glyphnote_tests.test.ts');
+
     Registry.disableDefaultRegistry();
     assert.ok(true);
   });
 
-  runTest('GlyphNote No Stave Padding', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('GlyphNote No Stave Padding', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     Registry.enableDefaultRegistry(new Registry());
 
-    const f = makeFactory(options.backend, options.elementId, 300, 400);
+    const f = makeFactory(options.backend, options.elementId, 300, 400, options);
     const system = f.System({
       x: 50,
       width: 250,
@@ -175,15 +193,17 @@ describe('GlyphNote', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'glyphnote_tests.test.ts');
+
     Registry.disableDefaultRegistry();
     assert.ok(true);
   });
 
-  runTest('GlyphNote RepeatNote', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('GlyphNote RepeatNote', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     Registry.enableDefaultRegistry(new Registry());
 
-    const f = makeFactory(options.backend, options.elementId, 300, 500);
+    const f = makeFactory(options.backend, options.elementId, 300, 500, options);
     const system = f.System({
       x: 50,
       width: 250,
@@ -213,6 +233,8 @@ describe('GlyphNote', () => {
     system.addConnector().setType(StaveConnector.type.BRACKET);
 
     f.draw();
+
+    await expectMatchingScreenshot(options, 'glyphnote_tests.test.ts');
 
     Registry.disableDefaultRegistry();
     assert.ok(true);

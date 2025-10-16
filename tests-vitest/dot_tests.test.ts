@@ -17,7 +17,14 @@ import { Stave } from '../src/stave';
 import { StaveNote } from '../src/stavenote';
 import { TickContext } from '../src/tickcontext';
 import { Voice } from '../src/voice';
-import { createAssert, FONT_STACKS, generateTestID, plotLegendForNoteWidth, TestOptions } from './vitest_test_helpers';
+import {
+  createAssert,
+  expectMatchingScreenshot,
+  FONT_STACKS,
+  generateTestID,
+  plotLegendForNoteWidth,
+  TestOptions,
+} from './vitest_test_helpers';
 
 /**
  * Helper function for the basic test case below.
@@ -32,9 +39,9 @@ function showOneNote(note1: StaveNote, stave: Stave, ctx: RenderContext, x: numb
 
 describe('Dot', () => {
   // Helper function to run a test with multiple backends and font stacks
-  function runTest(
+  async function runTest(
     testName: string,
-    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void | Promise<void>,
     backends: Array<{ backend: number; fontStacks: string[] }> = [
       { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
       { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
@@ -42,7 +49,7 @@ describe('Dot', () => {
   ) {
     backends.forEach(({ backend, fontStacks }) => {
       fontStacks.forEach((fontStackName) => {
-        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, async () => {
           const elementId = generateTestID('dot_test');
 
           // Create the DOM element before the test runs
@@ -51,7 +58,13 @@ describe('Dot', () => {
           element.id = elementId;
           document.body.appendChild(element);
 
-          const options: TestOptions = { elementId, params: {}, backend };
+          const options: TestOptions = {
+            elementId,
+            params: {},
+            backend,
+            testName,
+            fontStackName,
+          };
 
           // Set font stack
           const originalFontNames = Flow.getMusicFont();
@@ -60,7 +73,7 @@ describe('Dot', () => {
           try {
             const contextBuilder: ContextBuilder =
               backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
-            testFunc(options, contextBuilder);
+            await testFunc(options, contextBuilder);
           } finally {
             // Restore original font
             Flow.setMusicFont(...originalFontNames);
@@ -72,7 +85,7 @@ describe('Dot', () => {
     });
   }
 
-  runTest('Basic', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Basic', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const ctx = contextBuilder(options.elementId, 1000, 240);
 
@@ -134,10 +147,12 @@ describe('Dot', () => {
 
     plotLegendForNoteWidth(ctx, 890, 140);
 
+    await expectMatchingScreenshot(options, 'dot_tests.test.ts');
+
     assert.ok(true, 'Full Dot');
   });
 
-  runTest('Multi Voice', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Multi Voice', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const ctx = contextBuilder(options.elementId, 750, 300);
 
@@ -182,6 +197,8 @@ describe('Dot', () => {
     notes2.forEach((note) => Note.plotMetrics(ctx, note, 20));
 
     plotLegendForNoteWidth(ctx, 620, 220);
+
+    await expectMatchingScreenshot(options, 'dot_tests.test.ts');
 
     assert.ok(true, 'Full Dot');
   });

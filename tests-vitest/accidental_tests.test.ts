@@ -28,6 +28,7 @@ import {
   captureSvgScreenshot,
   compareScreenshots,
   createAssert,
+  expectMatchingScreenshot,
   FONT_STACKS,
   generateTestID,
   makeFactory,
@@ -188,8 +189,8 @@ describe('Accidental', () => {
     }
   });
 
-  runTest('Accidental Padding', (options: TestOptions, contextBuilder: ContextBuilder) => {
-    const f = makeFactory(options.backend, options.elementId, 750, 280);
+  runTest('Accidental Padding', async (options: TestOptions, contextBuilder: ContextBuilder) => {
+    const f = makeFactory(options.backend, options.elementId, 750, 280, options);
     const context = f.getContext();
     const softmaxFactor = 100;
     // Create the notes
@@ -260,13 +261,15 @@ describe('Accidental', () => {
 
     notes.forEach((note) => Note.plotMetrics(context, note, 30));
 
+    await expectMatchingScreenshot(options, 'accidental_tests.test.ts');
+
     // PlotLegendForNoteWidth not available in Vitest helpers yet
     createAssert().ok(true);
   });
 
-  runTest('Basic', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Basic', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 700, 240);
+    const f = makeFactory(options.backend, options.elementId, 700, 240, options);
     const accid = makeNewAccid(f);
     f.Stave({ x: 10, y: 10, width: 550 });
 
@@ -319,17 +322,19 @@ describe('Accidental', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'accidental_tests.test.ts');
+
     assert.ok(true, 'Full Accidental');
   });
 
-  runTest('Cautionary Accidental', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Cautionary Accidental', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const staveCount = 12;
     const scale = 0.85;
     const staveWidth = 840;
     let i = 0;
     let j = 0;
-    const f = makeFactory(options.backend, options.elementId, staveWidth + 10, 175 * staveCount + 10);
+    const f = makeFactory(options.backend, options.elementId, staveWidth + 10, 175 * staveCount + 10, options);
     f.getContext().scale(scale, scale);
 
     const accids = Object.keys(Flow.accidentalMap).filter((accid) => accid !== '{' && accid !== '}');
@@ -356,12 +361,15 @@ describe('Accidental', () => {
       f.Formatter().joinVoices([voice]).formatToStave([voice], stave);
       f.draw();
     }
+
+    await expectMatchingScreenshot(options, 'accidental_tests.test.ts');
+
     assert.ok(true, 'Must successfully render cautionary accidentals');
   });
 
   runTest('Accidental Arrangement Special Cases', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 700, 240);
+    const f = makeFactory(options.backend, options.elementId, 700, 240, options);
     const accid = makeNewAccid(f);
     f.Stave({ x: 10, y: 10, width: 550 });
 
@@ -416,43 +424,12 @@ describe('Accidental', () => {
 
     f.draw();
 
-    // Screenshot comparison for visual regression testing
-    // Using toMatchScreenshotWithinPercent(1) to allow up to 1% pixel difference
-    // You can adjust the threshold: toMatchScreenshotWithinPercent(0.5) for stricter 0.5%
-    // To update screenshots: npm run test:vitest:update (or vitest run -u)
-    if (options.backend === Renderer.Backends.CANVAS) {
-      const canvas = document.getElementById(options.elementId) as HTMLCanvasElement;
-      const width = canvas.width;
-      const height = canvas.height;
-      const backendName = 'Canvas';
-      const filepath = `tests-vitest/__screenshots__/accidental_tests.test.ts/${options.testName} - ${backendName} - ${options.fontStackName}.png`;
-
-      const newpng = captureCanvasScreenshot(canvas);
-      const oldpng = await readOrSaveScreenshot(newpng, { filepath, width, height });
-      const diffPercentage = compareScreenshots(oldpng, newpng, width, height);
-
-      expect(diffPercentage).toMatchScreenshotWithinPercent(1);
-    }
-
-    if (options.backend === Renderer.Backends.SVG) {
-      const div = document.getElementById(options.elementId) as HTMLDivElement;
-      const scale = 2;
-      const width = 700 * scale;
-      const height = 240 * scale;
-      const backendName = 'SVG';
-      const filepath = `tests-vitest/__screenshots__/accidental_tests.test.ts/${options.testName} - ${backendName} - ${options.fontStackName}.png`;
-
-      const newpng = await captureSvgScreenshot(div.innerHTML, width, height);
-      const oldpng = await readOrSaveScreenshot(newpng, { filepath, width, height });
-      const diffPercentage = compareScreenshots(oldpng, newpng, width, height);
-
-      expect(diffPercentage).toMatchScreenshotWithinPercent(1);
-    }
+    await expectMatchingScreenshot(options, 'accidental_tests.test.ts');
   });
 
-  runTest('Stem Down', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Stem Down', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 700, 240);
+    const f = makeFactory(options.backend, options.elementId, 700, 240, options);
     const accid = makeNewAccid(f);
     f.Stave({ x: 10, y: 10, width: 550 });
 
@@ -495,10 +472,12 @@ describe('Accidental', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'accidental_tests.test.ts');
+
     assert.ok(true, 'Full Accidental');
   });
 
-  runTest('Multi Voice', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Multi Voice', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     // Helper function for visualizing
     function showNotes(note1: StaveNote, note2: StaveNote, stave: Stave, ctx: RenderContext, x: number): void {
@@ -515,7 +494,7 @@ describe('Accidental', () => {
       Note.plotMetrics(ctx, note2, 15);
     }
 
-    const f = makeFactory(options.backend, options.elementId, 460, 250);
+    const f = makeFactory(options.backend, options.elementId, 460, 250, options);
     const accid = makeNewAccid(f);
     const stave = f.Stave({ x: 10, y: 45, width: 420 });
     const ctx = f.getContext();
@@ -566,12 +545,14 @@ describe('Accidental', () => {
 
     showNotes(note1, note2, stave, ctx, 250);
 
+    await expectMatchingScreenshot(options, 'accidental_tests.test.ts');
+
     assert.ok(true, 'Full Accidental');
   });
 
-  runTest('Microtonal', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Microtonal', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 700, 240);
+    const f = makeFactory(options.backend, options.elementId, 700, 240, options);
     const accid = makeNewAccid(f);
     const ctx = f.getContext();
     f.Stave({ x: 10, y: 10, width: 650 });
@@ -633,12 +614,14 @@ describe('Accidental', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'accidental_tests.test.ts');
+
     assert.ok(true, 'Microtonal Accidental');
   });
 
-  runTest('Microtonal (Iranian)', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Microtonal (Iranian)', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 700, 240);
+    const f = makeFactory(options.backend, options.elementId, 700, 240, options);
     const accid = makeNewAccid(f);
     const ctx = f.getContext();
     f.Stave({ x: 10, y: 10, width: 650 });
@@ -697,12 +680,14 @@ describe('Accidental', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'accidental_tests.test.ts');
+
     assert.ok(true, 'Microtonal Accidental (Iranian)');
   });
 
-  runTest('Sagittal', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Sagittal', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 700, 240);
+    const f = makeFactory(options.backend, options.elementId, 700, 240, options);
     const accid = makeNewAccid(f);
     const ctx = f.getContext();
     f.Stave({ x: 10, y: 10, width: 650 });
@@ -794,12 +779,14 @@ describe('Accidental', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'accidental_tests.test.ts');
+
     assert.ok(true, 'Sagittal');
   });
 
-  runTest('Automatic Accidentals', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Automatic Accidentals', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 700, 200);
+    const f = makeFactory(options.backend, options.elementId, 700, 200, options);
     const stave = f.Stave();
 
     const notes: StaveNote[] = [
@@ -832,12 +819,14 @@ describe('Accidental', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'accidental_tests.test.ts');
+
     assert.ok(true);
   });
 
-  runTest('Automatic Accidentals - C major scale in Ab', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Automatic Accidentals - C major scale in Ab', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 700, 150);
+    const f = makeFactory(options.backend, options.elementId, 700, 150, options);
     const stave = f.Stave().addKeySignature('Ab');
 
     const notes = [
@@ -859,14 +848,16 @@ describe('Accidental', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'accidental_tests.test.ts');
+
     assert.ok(true);
   });
 
   runTest(
     'Automatic Accidentals - No Accidentals Necessary',
-    (options: TestOptions, contextBuilder: ContextBuilder) => {
+    async (options: TestOptions, contextBuilder: ContextBuilder) => {
       const assert = createAssert();
-      const f = makeFactory(options.backend, options.elementId, 700, 150);
+      const f = makeFactory(options.backend, options.elementId, 700, 150, options);
       const stave = f.Stave().addKeySignature('A');
 
       const notes = [
@@ -888,15 +879,17 @@ describe('Accidental', () => {
 
       f.draw();
 
+      await expectMatchingScreenshot(options, 'accidental_tests.test.ts');
+
       assert.ok(true);
     }
   );
 
   runTest(
     'Automatic Accidentals - No Accidentals Necessary (EasyScore)',
-    (options: TestOptions, contextBuilder: ContextBuilder) => {
+    async (options: TestOptions, contextBuilder: ContextBuilder) => {
       const assert = createAssert();
-      const f = makeFactory(options.backend, options.elementId, 700, 150);
+      const f = makeFactory(options.backend, options.elementId, 700, 150, options);
       const stave = f.Stave().addKeySignature('A');
 
       const score = f.EasyScore();
@@ -911,13 +904,15 @@ describe('Accidental', () => {
 
       f.draw();
 
+      await expectMatchingScreenshot(options, 'accidental_tests.test.ts');
+
       assert.ok(true);
     }
   );
 
-  runTest('Automatic Accidentals - Multi Voice Inline', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Automatic Accidentals - Multi Voice Inline', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 700, 150);
+    const f = makeFactory(options.backend, options.elementId, 700, 150, options);
     const stave = f.Stave().addKeySignature('Ab');
 
     const notes0 = [
@@ -971,12 +966,14 @@ describe('Accidental', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'accidental_tests.test.ts');
+
     assert.ok(true);
   });
 
-  runTest('Automatic Accidentals - Multi Voice Offset', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Automatic Accidentals - Multi Voice Offset', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 700, 150);
+    const f = makeFactory(options.backend, options.elementId, 700, 150, options);
     const stave = f.Stave().addKeySignature('Cb');
 
     const notes0 = [
@@ -1031,12 +1028,14 @@ describe('Accidental', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'accidental_tests.test.ts');
+
     assert.ok(true);
   });
 
-  runTest('Automatic Accidentals - Key C, Single Octave', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Automatic Accidentals - Key C, Single Octave', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 700, 150);
+    const f = makeFactory(options.backend, options.elementId, 700, 150, options);
     const stave = f.Stave().addKeySignature('C');
 
     const notes0 = [
@@ -1069,12 +1068,14 @@ describe('Accidental', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'accidental_tests.test.ts');
+
     assert.ok(true);
   });
 
-  runTest('Automatic Accidentals - Key C, Two Octaves', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Automatic Accidentals - Key C, Two Octaves', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 700, 150);
+    const f = makeFactory(options.backend, options.elementId, 700, 150, options);
     const stave = f.Stave().addKeySignature('C');
 
     const notes0 = [
@@ -1125,12 +1126,14 @@ describe('Accidental', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'accidental_tests.test.ts');
+
     assert.ok(true);
   });
 
-  runTest('Automatic Accidentals - Key C#, Single Octave', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Automatic Accidentals - Key C#, Single Octave', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 700, 150);
+    const f = makeFactory(options.backend, options.elementId, 700, 150, options);
     const stave = f.Stave().addKeySignature('C#');
 
     const notes0 = [
@@ -1163,12 +1166,14 @@ describe('Accidental', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'accidental_tests.test.ts');
+
     assert.ok(true);
   });
 
-  runTest('Automatic Accidentals - Key C#, Two Octaves', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Automatic Accidentals - Key C#, Two Octaves', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 700, 150);
+    const f = makeFactory(options.backend, options.elementId, 700, 150, options);
     const stave = f.Stave().addKeySignature('C#');
 
     const notes0 = [
@@ -1219,12 +1224,14 @@ describe('Accidental', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'accidental_tests.test.ts');
+
     assert.ok(true);
   });
 
-  runTest('Factory API', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Factory API', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 700, 240);
+    const f = makeFactory(options.backend, options.elementId, 700, 240, options);
     f.Stave({ x: 10, y: 10, width: 550 });
 
     const accid = makeNewAccid(f);
@@ -1275,6 +1282,9 @@ describe('Accidental', () => {
     });
 
     f.draw();
+
+    await expectMatchingScreenshot(options, 'accidental_tests.test.ts');
+
     assert.ok(true, 'Factory API');
   });
 });

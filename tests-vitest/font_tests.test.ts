@@ -8,6 +8,7 @@ import { afterAll, beforeAll, describe, test } from 'vitest';
 import { Accidental } from '../src/accidental';
 import { Bend } from '../src/bend';
 import { CanvasContext } from '../src/canvascontext';
+import { ContextBuilder } from '../src/factory';
 import { Element } from '../src/element';
 import { Flow } from '../src/flow';
 import { Font, FontStyle, FontWeight } from '../src/font';
@@ -17,7 +18,14 @@ import { StaveNote } from '../src/stavenote';
 import { TextBracket } from '../src/textbracket';
 import { TextNote } from '../src/textnote';
 import { Voice } from '../src/voice';
-import { createAssert, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
+import {
+  createAssert,
+  expectMatchingScreenshot,
+  FONT_STACKS,
+  generateTestID,
+  makeFactory,
+  TestOptions,
+} from './vitest_test_helpers';
 
 describe('Font', () => {
   let originalFontNames: string[];
@@ -32,9 +40,9 @@ describe('Font', () => {
   });
 
   // Helper function to run a test with multiple backends and font stacks
-  function runTest(
+  async function runTest(
     testName: string,
-    testFunc: (options: TestOptions) => void,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void | Promise<void>,
     backends: Array<{ backend: number; fontStacks: string[] }> = [
       { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
       { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
@@ -42,7 +50,7 @@ describe('Font', () => {
   ) {
     backends.forEach(({ backend, fontStacks }) => {
       fontStacks.forEach((fontStackName) => {
-        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, async () => {
           const elementId = generateTestID('font_test');
 
           // Create the DOM element before the test runs
@@ -51,14 +59,14 @@ describe('Font', () => {
           element.id = elementId;
           document.body.appendChild(element);
 
-          const options: TestOptions = { elementId, params: {}, backend };
+          const options: TestOptions = { elementId, params: {}, backend, testName, fontStackName };
 
           // Set font stack
           const originalFontNames = Flow.getMusicFont();
           Flow.setMusicFont(...FONT_STACKS[fontStackName]);
 
           try {
-            testFunc(options);
+            await testFunc(options, {} as ContextBuilder);
           } finally {
             // Restore original font
             Flow.setMusicFont(...originalFontNames);
@@ -168,9 +176,9 @@ describe('Font', () => {
     }
   });
 
-  runTest('Set Text Font to Georgia', (options: TestOptions) => {
+  runTest('Set Text Font to Georgia', async (options: TestOptions) => {
     const assert = createAssert();
-    const factory = makeFactory(options.backend, options.elementId, 400, 200);
+    const factory = makeFactory(options.backend, options.elementId, 400, 200, options);
     const stave = factory.Stave({ y: 40 });
     const score = factory.EasyScore();
 
@@ -201,16 +209,18 @@ describe('Font', () => {
 
     factory.draw();
 
+    await expectMatchingScreenshot(options, 'font_tests.test.ts');
+
     // Restore the previous default, or else it will affect the rest of the tests.
     TextNote.TEXT_FONT = defaultFont;
     assert.ok(true);
   });
 
-  runTest('Set Music Font to Petaluma', (options: TestOptions) => {
+  runTest('Set Music Font to Petaluma', async (options: TestOptions) => {
     const assert = createAssert();
     Flow.setMusicFont('Petaluma');
 
-    const factory = makeFactory(options.backend, options.elementId, 400, 200);
+    const factory = makeFactory(options.backend, options.elementId, 400, 200, options);
     const stave = factory.Stave({ y: 40 });
     const score = factory.EasyScore();
 
@@ -224,6 +234,8 @@ describe('Font', () => {
     formatter.joinVoices([voice]).formatToStave([voice], stave);
 
     factory.draw();
+
+    await expectMatchingScreenshot(options, 'font_tests.test.ts');
 
     assert.ok(true);
   });

@@ -17,7 +17,7 @@ import { TabNote, TabNoteStruct } from '../src/tabnote';
 import { TabStave } from '../src/tabstave';
 import { TabTie } from '../src/tabtie';
 import { Voice } from '../src/voice';
-import { createAssert, FONT_STACKS, generateTestID, TestOptions } from './vitest_test_helpers';
+import { createAssert, expectMatchingScreenshot, FONT_STACKS, generateTestID, TestOptions } from './vitest_test_helpers';
 
 /**
  * Helper function to create TabNote objects.
@@ -50,9 +50,9 @@ function tieNotes(notes: Note[], indices: number[], stave: Stave, ctx: RenderCon
 
 describe('TabTie', () => {
   // Helper function to run a test with multiple backends and font stacks
-  function runTest(
+  async function runTest(
     testName: string,
-    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void | Promise<void>,
     backends: Array<{ backend: number; fontStacks: string[] }> = [
       { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
       { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
@@ -60,7 +60,7 @@ describe('TabTie', () => {
   ) {
     backends.forEach(({ backend, fontStacks }) => {
       fontStacks.forEach((fontStackName) => {
-        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, async () => {
           const elementId = generateTestID('tabtie_test');
 
           // Create the DOM element before the test runs
@@ -70,7 +70,7 @@ describe('TabTie', () => {
           document.body.appendChild(element);
 
           const assert = createAssert();
-          const options: TestOptions = { elementId, params: {}, backend };
+          const options: TestOptions = { elementId, params: {}, backend, testName, fontStackName };
 
           // Set font stack
           const originalFontNames = Flow.getMusicFont();
@@ -79,7 +79,7 @@ describe('TabTie', () => {
           try {
             const contextBuilder: ContextBuilder =
               backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
-            testFunc(options, contextBuilder);
+            await testFunc(options, contextBuilder);
           } finally {
             // Restore original font
             Flow.setMusicFont(...originalFontNames);
@@ -94,7 +94,7 @@ describe('TabTie', () => {
   /**
    * Two notes on string 4 with a tie drawn between them.
    */
-  runTest('Simple TabTie', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Simple TabTie', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const context = contextBuilder(options.elementId, 350, 160);
     context.setFont('Arial', 10);
@@ -104,6 +104,7 @@ describe('TabTie', () => {
     const note2 = tabNote({ positions: [{ str: 4, fret: 6 }], duration: 'h' });
     tieNotes([note1, note2], [0], stave, context);
 
+    await expectMatchingScreenshot(options, 'tabtie_tests.test.ts');
     assert.ok(true, 'Simple Test');
   });
 
@@ -111,7 +112,7 @@ describe('TabTie', () => {
    * Helper function for the two test cases below (simpleHammerOn and simplePullOff).
    */
   function multiTest(testName: string, createTabTie: (notes: TieNotes) => TabTie): void {
-    runTest(testName, (options: TestOptions, contextBuilder: ContextBuilder) => {
+    runTest(testName, async (options: TestOptions, contextBuilder: ContextBuilder) => {
       const assert = createAssert();
       const context = contextBuilder(options.elementId, 440, 140);
       context.setFont('Arial', 10);
@@ -198,6 +199,7 @@ describe('TabTie', () => {
         .setContext(context)
         .draw();
 
+      await expectMatchingScreenshot(options, 'tabtie_tests.test.ts');
       assert.ok(true, 'Chord high-fret');
     });
   }
@@ -205,7 +207,7 @@ describe('TabTie', () => {
   multiTest('Hammerons', TabTie.createHammeron);
   multiTest('Pulloffs', TabTie.createPulloff);
 
-  runTest('Tapping', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Tapping', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const context = contextBuilder(options.elementId, 350, 160);
     context.setFont('Arial', 10);
@@ -215,10 +217,11 @@ describe('TabTie', () => {
     const note2 = tabNote({ positions: [{ str: 4, fret: 10 }], duration: 'h' });
     tieNotes([note1, note2], [0], stave, context, 'P');
 
+    await expectMatchingScreenshot(options, 'tabtie_tests.test.ts');
     assert.ok(true, 'Tapping Test');
   });
 
-  runTest('Continuous', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Continuous', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const context = contextBuilder(options.elementId, 440, 140);
     context.setFont('Arial', 10);
@@ -251,6 +254,8 @@ describe('TabTie', () => {
     })
       .setContext(context)
       .draw();
+
+    await expectMatchingScreenshot(options, 'tabtie_tests.test.ts');
     assert.ok(true, 'Continuous Hammeron');
   });
 });

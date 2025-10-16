@@ -12,13 +12,13 @@ import { ContextBuilder, Renderer } from '../src/renderer';
 import { Stave } from '../src/stave';
 import { Stem } from '../src/stem';
 import { StemmableNote } from '../src/stemmablenote';
-import { createAssert, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
+import { createAssert, expectMatchingScreenshot, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
 
 describe('StaveTie', () => {
   // Helper function to run a test with multiple backends and font stacks
-  function runTest(
+  async function runTest(
     testName: string,
-    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void | Promise<void>,
     backends: Array<{ backend: number; fontStacks: string[] }> = [
       { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
       { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
@@ -26,7 +26,7 @@ describe('StaveTie', () => {
   ) {
     backends.forEach(({ backend, fontStacks }) => {
       fontStacks.forEach((fontStackName) => {
-        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, async () => {
           const elementId = generateTestID('stavetie_test');
 
           // Create the DOM element before the test runs
@@ -36,7 +36,7 @@ describe('StaveTie', () => {
           document.body.appendChild(element);
 
           const assert = createAssert();
-          const options: TestOptions = { elementId, params: {}, backend };
+          const options: TestOptions = { elementId, params: {}, backend, testName, fontStackName };
 
           // Set font stack
           const originalFontNames = Flow.getMusicFont();
@@ -45,7 +45,7 @@ describe('StaveTie', () => {
           try {
             const contextBuilder: ContextBuilder =
               backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
-            testFunc(options, contextBuilder);
+            await testFunc(options, contextBuilder);
           } finally {
             // Restore original font
             Flow.setMusicFont(...originalFontNames);
@@ -64,9 +64,9 @@ describe('StaveTie', () => {
     notesData: [string, BuilderOptions],
     setupTies: (f: Factory, n: StemmableNote[], s: Stave) => void
   ) {
-    return (options: TestOptions) => {
+    return async (options: TestOptions) => {
       const assert = createAssert();
-      const factory = makeFactory(options.backend, options.elementId, 300);
+      const factory = makeFactory(options.backend, options.elementId, 300, 140, options);
       const stave = factory.Stave();
       const score = factory.EasyScore();
       const notes = score.notes(notesData[0], notesData[1]);
@@ -76,6 +76,7 @@ describe('StaveTie', () => {
 
       factory.Formatter().joinVoices([voice]).formatToStave([voice], stave);
       factory.draw();
+      await expectMatchingScreenshot(options, 'stavetie_tests.test.ts');
       assert.ok(true);
     };
   }

@@ -18,7 +18,14 @@ import { Formatter } from '../src/formatter';
 import { GraceNote, GraceNoteStruct } from '../src/gracenote';
 import { ContextBuilder, Renderer } from '../src/renderer';
 import { StaveNote, StaveNoteStruct } from '../src/stavenote';
-import { createAssert, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
+import {
+  createAssert,
+  expectMatchingScreenshot,
+  FONT_STACKS,
+  generateTestID,
+  makeFactory,
+  TestOptions,
+} from './vitest_test_helpers';
 
 // A NoteBuilder is one of two functions: Factory.StaveNote | Factory.GraceNote.
 type NoteBuilder = InstanceType<typeof Factory>['StaveNote'] | InstanceType<typeof Factory>['GraceNote'];
@@ -44,9 +51,9 @@ const createNoteForStemTest = (
 
 describe('Grace Notes', () => {
   // Helper function to run a test with multiple backends and font stacks
-  function runTest(
+  async function runTest(
     testName: string,
-    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void | Promise<void>,
     backends: Array<{ backend: number; fontStacks: string[] }> = [
       { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
       { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
@@ -54,7 +61,7 @@ describe('Grace Notes', () => {
   ) {
     backends.forEach(({ backend, fontStacks }) => {
       fontStacks.forEach((fontStackName) => {
-        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, async () => {
           const elementId = generateTestID('gracenote_test');
 
           // Create the DOM element before the test runs
@@ -64,7 +71,13 @@ describe('Grace Notes', () => {
           document.body.appendChild(element);
 
           const assert = createAssert();
-          const options: TestOptions = { elementId, params: {}, backend };
+          const options: TestOptions = {
+            elementId,
+            params: {},
+            backend,
+            testName,
+            fontStackName,
+          };
 
           // Set font stack
           const originalFontNames = Flow.getMusicFont();
@@ -73,7 +86,7 @@ describe('Grace Notes', () => {
           try {
             const contextBuilder: ContextBuilder =
               backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
-            testFunc(options, contextBuilder);
+            await testFunc(options, contextBuilder);
           } finally {
             // Restore original font
             Flow.setMusicFont(...originalFontNames);
@@ -85,9 +98,9 @@ describe('Grace Notes', () => {
     });
   }
 
-  runTest('Grace Note Basic', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Grace Note Basic', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 700, 130);
+    const f = makeFactory(options.backend, options.elementId, 700, 130, options);
     const stave = f.Stave({ x: 10, y: 10, width: 650 });
 
     const gracenotes = [
@@ -144,12 +157,14 @@ describe('Grace Notes', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'gracenote_tests.test.ts');
+
     assert.ok(true, 'GraceNoteBasic');
   });
 
-  runTest('With Articulation and Annotation on Parent Note', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('With Articulation and Annotation on Parent Note', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 700, 130);
+    const f = makeFactory(options.backend, options.elementId, 700, 130, options);
     const stave = f.Stave({ x: 10, y: 10, width: 650 });
 
     const gracenotes = [{ keys: ['b/4'], duration: '8', slash: false }].map(f.GraceNote.bind(f));
@@ -191,12 +206,14 @@ describe('Grace Notes', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'gracenote_tests.test.ts');
+
     assert.ok(true, 'GraceNoteModifiers');
   });
 
-  runTest('Grace Note Basic with Slurs', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Grace Note Basic with Slurs', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 700, 130);
+    const f = makeFactory(options.backend, options.elementId, 700, 130, options);
     const stave = f.Stave({ x: 10, y: 10, width: 650 });
 
     const gracenotes0 = [
@@ -255,12 +272,14 @@ describe('Grace Notes', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'gracenote_tests.test.ts');
+
     assert.ok(true, 'GraceNoteBasic');
   });
 
-  runTest('Grace Note Stem', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Grace Note Stem', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 700, 130);
+    const f = makeFactory(options.backend, options.elementId, 700, 130, options);
     const stave = f.Stave({ x: 10, y: 10, width: 650 });
 
     function createNotes(noteBuilder: NoteBuilder, keys: string[], stem_direction: number) {
@@ -283,17 +302,19 @@ describe('Grace Notes', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'gracenote_tests.test.ts');
+
     assert.ok(true, 'GraceNoteStem');
   });
 
-  runTest('Grace Note Stem with Beams 1', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Grace Note Stem with Beams 1', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const keys1 = ['g/4'];
     const stemDirection1 = 1;
     const keys2 = ['d/5'];
     const stemDirection2 = -1;
 
-    const f = makeFactory(options.backend, options.elementId, 700, 130);
+    const f = makeFactory(options.backend, options.elementId, 700, 130, options);
     const stave = f.Stave({ x: 10, y: 10, width: 650 });
 
     function createBeamedNotes(
@@ -339,17 +360,19 @@ describe('Grace Notes', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'gracenote_tests.test.ts');
+
     assert.ok(true, 'GraceNoteStem');
   });
 
-  runTest('Grace Note Stem with Beams 2', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Grace Note Stem with Beams 2', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const keys1 = ['a/3'];
     const stemDirection1 = 1;
     const keys2 = ['a/5'];
     const stemDirection2 = -1;
 
-    const f = makeFactory(options.backend, options.elementId, 700, 130);
+    const f = makeFactory(options.backend, options.elementId, 700, 130, options);
     const stave = f.Stave({ x: 10, y: 10, width: 650 });
 
     function createBeamedNotes(
@@ -395,17 +418,19 @@ describe('Grace Notes', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'gracenote_tests.test.ts');
+
     assert.ok(true, 'GraceNoteStem');
   });
 
-  runTest('Grace Note Stem with Beams 3', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Grace Note Stem with Beams 3', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const keys1 = ['c/4'];
     const stemDirection1 = 1;
     const keys2 = ['c/6'];
     const stemDirection2 = -1;
 
-    const f = makeFactory(options.backend, options.elementId, 700, 130);
+    const f = makeFactory(options.backend, options.elementId, 700, 130, options);
     const stave = f.Stave({ x: 10, y: 10, width: 650 });
 
     function createBeamedNotes(
@@ -451,12 +476,14 @@ describe('Grace Notes', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'gracenote_tests.test.ts');
+
     assert.ok(true, 'GraceNoteStem');
   });
 
-  runTest('Grace Note Slash', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Grace Note Slash', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 700, 130);
+    const f = makeFactory(options.backend, options.elementId, 700, 130, options);
     const stave = f.Stave({ x: 10, y: 10, width: 650 });
 
     function createNotes(noteT: typeof f.GraceNote, keys: string[], stem_direction: number, slash: boolean) {
@@ -504,12 +531,14 @@ describe('Grace Notes', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'gracenote_tests.test.ts');
+
     assert.ok(true, 'GraceNoteSlash');
   });
 
-  runTest('Grace Note Slash with Beams', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Grace Note Slash with Beams', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 800, 130);
+    const f = makeFactory(options.backend, options.elementId, 800, 130, options);
     const stave = f.Stave({ x: 10, y: 10, width: 750 });
 
     function createNoteBlock(keys: string[], stem_direction: number) {
@@ -551,12 +580,14 @@ describe('Grace Notes', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'gracenote_tests.test.ts');
+
     assert.ok(true, 'GraceNoteSlashWithBeams');
   });
 
-  runTest('Grace Notes Multiple Voices', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Grace Notes Multiple Voices', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 450, 140);
+    const f = makeFactory(options.backend, options.elementId, 450, 140, options);
     const stave = f.Stave({ x: 10, y: 10, width: 450 });
 
     const notes = [
@@ -616,13 +647,15 @@ describe('Grace Notes', () => {
     f.Formatter().joinVoices([voice, voice2]).formatToStave([voice, voice2], stave);
 
     f.draw();
+
+    await expectMatchingScreenshot(options, 'gracenote_tests.test.ts');
 
     assert.ok(true, 'Sixteenth Test');
   });
 
-  runTest('Grace Notes Multiple Voices Multiple Draws', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Grace Notes Multiple Voices Multiple Draws', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 450, 140);
+    const f = makeFactory(options.backend, options.elementId, 450, 140, options);
     const stave = f.Stave({ x: 10, y: 10, width: 450 });
 
     const notes = [
@@ -683,6 +716,8 @@ describe('Grace Notes', () => {
 
     f.draw();
     f.draw();
+
+    await expectMatchingScreenshot(options, 'gracenote_tests.test.ts');
 
     assert.ok(true, 'Seventeenth Test');
   });

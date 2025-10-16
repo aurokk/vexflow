@@ -13,7 +13,7 @@ import { Note } from '../src/note';
 import { ContextBuilder, Renderer } from '../src/renderer';
 import { BarlineType } from '../src/stavebarline';
 import { StaveNote, StaveNoteStruct } from '../src/stavenote';
-import { createAssert, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
+import { createAssert, expectMatchingScreenshot, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
 
 function createShortcuts(f: Factory) {
   return {
@@ -25,9 +25,9 @@ function createShortcuts(f: Factory) {
 
 describe('NoteSubGroup', () => {
   // Helper function to run a test with multiple backends and font stacks
-  function runTest(
+  async function runTest(
     testName: string,
-    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void | Promise<void>,
     backends: Array<{ backend: number; fontStacks: string[] }> = [
       { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
       { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
@@ -35,7 +35,7 @@ describe('NoteSubGroup', () => {
   ) {
     backends.forEach(({ backend, fontStacks }) => {
       fontStacks.forEach((fontStackName) => {
-        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, async () => {
           const elementId = generateTestID('notesubgroup_test');
 
           // Create the DOM element before the test runs
@@ -44,8 +44,13 @@ describe('NoteSubGroup', () => {
           element.id = elementId;
           document.body.appendChild(element);
 
-          const assert = createAssert();
-          const options: TestOptions = { elementId, params: {}, backend };
+          const options: TestOptions = {
+            elementId,
+            params: {},
+            backend,
+            testName,
+            fontStackName,
+          };
 
           // Set font stack
           const originalFontNames = Flow.getMusicFont();
@@ -54,7 +59,7 @@ describe('NoteSubGroup', () => {
           try {
             const contextBuilder: ContextBuilder =
               backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
-            testFunc(options, contextBuilder);
+            await testFunc(options, contextBuilder);
           } finally {
             // Restore original font
             Flow.setMusicFont(...originalFontNames);
@@ -66,9 +71,9 @@ describe('NoteSubGroup', () => {
     });
   }
 
-  runTest('Basic - ClefNote, TimeSigNote and BarNote', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Basic - ClefNote, TimeSigNote and BarNote', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 750, 200);
+    const f = makeFactory(options.backend, options.elementId, 750, 200, options);
     const ctx = f.getContext();
     const stave = f.Stave({ width: 600 }).addClef('treble');
 
@@ -105,12 +110,14 @@ describe('NoteSubGroup', () => {
 
     notes.forEach((note) => Note.plotMetrics(ctx, note, 150));
 
+    await expectMatchingScreenshot(options, 'notesubgroup_tests.test.ts');
+
     assert.ok(true, 'all pass');
   });
 
-  runTest('Multi Voice', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Multi Voice', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 550, 200);
+    const f = makeFactory(options.backend, options.elementId, 550, 200, options);
     const ctx = f.getContext();
     const stave = f.Stave().addClef('treble');
 
@@ -155,12 +162,14 @@ describe('NoteSubGroup', () => {
 
     notes1.forEach((note) => Note.plotMetrics(ctx, note, 150));
 
+    await expectMatchingScreenshot(options, 'notesubgroup_tests.test.ts');
+
     assert.ok(true, 'all pass');
   });
 
-  runTest('Multi Voice Multiple Draws', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Multi Voice Multiple Draws', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 550, 200);
+    const f = makeFactory(options.backend, options.elementId, 550, 200, options);
     const ctx = f.getContext();
     const stave = f.Stave().addClef('treble');
 
@@ -207,12 +216,14 @@ describe('NoteSubGroup', () => {
 
     notes1.forEach((note) => Note.plotMetrics(ctx, note, 150));
 
+    await expectMatchingScreenshot(options, 'notesubgroup_tests.test.ts');
+
     assert.ok(true, 'all pass');
   });
 
-  runTest('Multi Staff', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Multi Staff', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 550, 400);
+    const f = makeFactory(options.backend, options.elementId, 550, 400, options);
 
     const { createStaveNote, addAccidental, addSubGroup } = createShortcuts(f);
 
@@ -270,6 +281,8 @@ describe('NoteSubGroup', () => {
     f.Formatter().joinVoices([voice1, voice2]).joinVoices([voice3]).formatToStave([voice1, voice2, voice3], stave1);
 
     f.draw();
+
+    await expectMatchingScreenshot(options, 'notesubgroup_tests.test.ts');
 
     assert.ok(true, 'all pass');
   });

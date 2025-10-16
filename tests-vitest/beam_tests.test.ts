@@ -22,15 +22,15 @@ import { describe, test } from 'vitest';
 
 import { Flow } from '../src/flow';
 import { Renderer, ContextBuilder } from '../src/renderer';
-import { createAssert, FONT_STACKS, generateTestID, TestOptions } from './vitest_test_helpers';
+import { createAssert, expectMatchingScreenshot, FONT_STACKS, generateTestID, TestOptions } from './vitest_test_helpers';
 
 // Helper to flatten arrays
 const concat = <T>(a: T[], b: T[]): T[] => a.concat(b);
 
 describe('Beam', () => {
-  function runTest(
+  async function runTest(
     testName: string,
-    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void | Promise<void>,
     backends: Array<{ backend: number; fontStacks: string[] }> = [
       { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
       { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
@@ -38,21 +38,21 @@ describe('Beam', () => {
   ) {
     backends.forEach(({ backend, fontStacks }) => {
       fontStacks.forEach((fontStackName) => {
-        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, async () => {
           const elementId = generateTestID('test');
           const tagName = backend === Renderer.Backends.SVG ? 'div' : 'canvas';
           const element = document.createElement(tagName);
           element.id = elementId;
           document.body.appendChild(element);
 
-          const options: TestOptions = { elementId, params: {}, backend };
+          const options: TestOptions = { elementId, params: {}, backend, testName, fontStackName };
           const originalFontNames = Flow.getMusicFont();
           Flow.setMusicFont(...FONT_STACKS[fontStackName]);
 
           try {
             const contextBuilder: ContextBuilder =
               backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
-            testFunc(options, contextBuilder);
+            await testFunc(options, contextBuilder);
           } finally {
             Flow.setMusicFont(...originalFontNames);
           }
@@ -60,7 +60,7 @@ describe('Beam', () => {
       });
     });
   }
-  runTest('Simple Beam', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Simple Beam', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const f = new Factory({ renderer: { elementId: options.elementId, backend: options.backend, width: 450, height: 140 } });
     const stave = f.Stave();
@@ -81,10 +81,12 @@ describe('Beam', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'beam_tests.test.ts');
+
     assert.ok(true, 'Simple Test');
   });
 
-  runTest('Multi Beam', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Multi Beam', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const f = new Factory({ renderer: { elementId: options.elementId, backend: options.backend, width: 450, height: 140 } });
     const stave = f.Stave();
@@ -109,10 +111,12 @@ describe('Beam', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'beam_tests.test.ts');
+
     assert.ok(true, 'Multi Test');
   });
 
-  runTest('Sixteenth Beam', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Sixteenth Beam', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const f = new Factory({ renderer: { elementId: options.elementId, backend: options.backend, width: 450, height: 140 } });
     const stave = f.Stave();
@@ -143,10 +147,12 @@ describe('Beam', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'beam_tests.test.ts');
+
     assert.ok(true, 'Sixteenth Test');
   });
 
-  runTest('Slopey Beam', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Slopey Beam', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const f = new Factory({ renderer: { elementId: options.elementId, backend: options.backend, width: 350, height: 140 } });
     const stave = f.Stave({ y: 20 });
@@ -165,10 +171,12 @@ describe('Beam', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'beam_tests.test.ts');
+
     assert.ok(true, 'Slopey Test');
   });
 
-  runTest('Auto-stemmed Beam', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Auto-stemmed Beam', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const f = new Factory({ renderer: { elementId: options.elementId, backend: options.backend, width: 350, height: 140 } });
     const stave = f.Stave({ y: 20 });
@@ -203,10 +211,12 @@ describe('Beam', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'beam_tests.test.ts');
+
     assert.ok(true, 'AutoStem Beam Test');
   });
 
-  runTest('Mixed Beam 1', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Mixed Beam 1', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const f = new Factory({ renderer: { elementId: options.elementId, backend: options.backend, width: 350, height: 140 } });
     const stave = f.Stave({ y: 20 });
@@ -236,10 +246,12 @@ describe('Beam', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'beam_tests.test.ts');
+
     assert.ok(true, 'Multi Test');
   });
 
-  runTest('Mixed Beam 2', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Mixed Beam 2', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const f = new Factory({ renderer: { elementId: options.elementId, backend: options.backend, width: 450, height: 180 } });
     const stave = f.Stave({ y: 20 });
@@ -266,10 +278,12 @@ describe('Beam', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'beam_tests.test.ts');
+
     assert.ok(true, 'Multi Test');
   });
 
-  runTest('Dotted Beam', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Dotted Beam', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const f = new Factory({ renderer: { elementId: options.elementId, backend: options.backend, width: 450, height: 140 } });
     const stave = f.Stave();
@@ -289,10 +303,12 @@ describe('Beam', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'beam_tests.test.ts');
+
     assert.ok(true, 'Dotted Test');
   });
 
-  runTest('Partial Beam', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Partial Beam', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const f = new Factory({ renderer: { elementId: options.elementId, backend: options.backend, width: 450, height: 140 } });
     const stave = f.Stave();
@@ -315,10 +331,12 @@ describe('Beam', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'beam_tests.test.ts');
+
     assert.ok(true, 'Partial Test');
   });
 
-  runTest('Close Trade-offs Beam', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Close Trade-offs Beam', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const f = new Factory({ renderer: { elementId: options.elementId, backend: options.backend, width: 450, height: 140 } });
     const stave = f.Stave();
@@ -334,10 +352,12 @@ describe('Beam', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'beam_tests.test.ts');
+
     assert.ok(true, 'Close Trade-offs Test');
   });
 
-  runTest('Insane Beam', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Insane Beam', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const f = new Factory({ renderer: { elementId: options.elementId, backend: options.backend, width: 450, height: 180 } });
     const stave = f.Stave({ y: 20 });
@@ -355,10 +375,12 @@ describe('Beam', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'beam_tests.test.ts');
+
     assert.ok(true, 'Insane Test');
   });
 
-  runTest('Lengthy Beam', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Lengthy Beam', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const f = new Factory({ renderer: { elementId: options.elementId, backend: options.backend, width: 450, height: 180 } });
     const stave = f.Stave({ y: 20 });
@@ -370,10 +392,12 @@ describe('Beam', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'beam_tests.test.ts');
+
     assert.ok(true, 'Lengthy Test');
   });
 
-  runTest('Outlier Beam', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Outlier Beam', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const f = new Factory({ renderer: { elementId: options.elementId, backend: options.backend, width: 450, height: 180 } });
     const stave = f.Stave({ y: 20 });
@@ -396,10 +420,12 @@ describe('Beam', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'beam_tests.test.ts');
+
     assert.ok(true, 'Outlier Test');
   });
 
-  runTest('Break Secondary Beams', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Break Secondary Beams', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const f = new Factory({ renderer: { elementId: options.elementId, backend: options.backend, width: 600, height: 200 } });
     const stave = f.Stave({ y: 20 });
@@ -432,10 +458,12 @@ describe('Beam', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'beam_tests.test.ts');
+
     assert.ok(true, 'Breaking Secondary Beams Test');
   });
 
-  runTest('Partial Beam Direction', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Partial Beam Direction', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const f = new Factory({ renderer: { elementId: options.elementId, backend: options.backend, width: 600, height: 200 } });
     const stave = f.Stave({ y: 20 });
@@ -463,10 +491,12 @@ describe('Beam', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'beam_tests.test.ts');
+
     assert.ok(true, 'Partial beam direction test');
   });
 
-  runTest('TabNote Beams Up', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('TabNote Beams Up', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const f = new Factory({ renderer: { elementId: options.elementId, backend: options.backend, width: 600, height: 200 } });
     const stave = f.TabStave({ y: 20 });
@@ -543,10 +573,12 @@ describe('Beam', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'beam_tests.test.ts');
+
     assert.ok(true, 'All objects have been drawn');
   });
 
-  runTest('TabNote Beams Down', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('TabNote Beams Down', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const f = new Factory({ renderer: { elementId: options.elementId, backend: options.backend, width: 600, height: 250 } });
     const stave = f.TabStave({ options: { num_lines: 10 } });
@@ -638,10 +670,12 @@ describe('Beam', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'beam_tests.test.ts');
+
     assert.ok(true, 'All objects have been drawn');
   });
 
-  runTest('TabNote Auto Create Beams', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('TabNote Auto Create Beams', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const f = new Factory({ renderer: { elementId: options.elementId, backend: options.backend, width: 600, height: 200 } });
     const stave = f.TabStave();
@@ -699,12 +733,14 @@ describe('Beam', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'beam_tests.test.ts');
+
     beams.forEach((beam) => beam.setContext(f.getContext()).draw());
 
     assert.ok(true, 'All objects have been drawn');
   });
 
-  runTest('TabNote Beams Auto Stem', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('TabNote Beams Auto Stem', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const f = new Factory({ renderer: { elementId: options.elementId, backend: options.backend, width: 600, height: 300 } });
     const stave = f.TabStave();
@@ -770,10 +806,12 @@ describe('Beam', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'beam_tests.test.ts');
+
     assert.ok(true, 'All objects have been drawn');
   });
 
-  runTest('Complex Beams with Annotations', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Complex Beams with Annotations', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const factory = new Factory({ renderer: { elementId: options.elementId, backend: options.backend, width: 500, height: 200 } });
     const stave = factory.Stave({ y: 40 });
@@ -826,10 +864,12 @@ describe('Beam', () => {
 
     factory.draw();
 
+    await expectMatchingScreenshot(options, 'beam_tests.test.ts');
+
     assert.ok(true, 'Complex beam annotations');
   });
 
-  runTest('Complex Beams with Articulations', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Complex Beams with Articulations', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const f = new Factory({ renderer: { elementId: options.elementId, backend: options.backend, width: 500, height: 200 } });
     const stave = f.Stave({ y: 40 });
@@ -870,10 +910,12 @@ describe('Beam', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'beam_tests.test.ts');
+
     assert.ok(true, 'Complex beam articulations');
   });
 
-  runTest('Complex Beams with Articulations two Staves', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Complex Beams with Articulations two Staves', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const f = new Factory({ renderer: { elementId: options.elementId, backend: options.backend, width: 500, height: 300 } });
     const system = f.System();
@@ -924,6 +966,8 @@ describe('Beam', () => {
     system.addStave({ voices: [voice2] });
 
     f.draw();
+
+    await expectMatchingScreenshot(options, 'beam_tests.test.ts');
 
     assert.ok(true, 'Complex beam articulations two staves');
   });

@@ -12,7 +12,7 @@ import { KeySignature } from '../src/keysignature';
 import { ContextBuilder, Renderer } from '../src/renderer';
 import { Stave } from '../src/stave';
 import { BarlineType } from '../src/stavebarline';
-import { createAssert, FONT_STACKS, generateTestID, MAJOR_KEYS, makeFactory, MINOR_KEYS, TestOptions } from './vitest_test_helpers';
+import { createAssert, expectMatchingScreenshot, FONT_STACKS, generateTestID, MAJOR_KEYS, makeFactory, MINOR_KEYS, TestOptions } from './vitest_test_helpers';
 
 
 const fontWidths = () => {
@@ -26,9 +26,9 @@ const fontWidths = () => {
 
 describe('KeySignature', () => {
   // Helper function to run a test with multiple backends and font stacks
-  function runTest(
+  async function runTest(
     testName: string,
-    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void | Promise<void>,
     backends: Array<{ backend: number; fontStacks: string[] }> = [
       { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
       { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
@@ -36,7 +36,7 @@ describe('KeySignature', () => {
   ) {
     backends.forEach(({ backend, fontStacks }) => {
       fontStacks.forEach((fontStackName) => {
-        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, async () => {
           const elementId = generateTestID('keysignature_test');
 
           // Create the DOM element before the test runs
@@ -45,8 +45,13 @@ describe('KeySignature', () => {
           element.id = elementId;
           document.body.appendChild(element);
 
-          const assert = createAssert();
-          const options: TestOptions = { elementId, params: {}, backend };
+          const options: TestOptions = {
+            elementId,
+            params: {},
+            backend,
+            testName,
+            fontStackName,
+          };
 
           // Set font stack
           const originalFontNames = Flow.getMusicFont();
@@ -55,7 +60,7 @@ describe('KeySignature', () => {
           try {
             const contextBuilder: ContextBuilder =
               backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
-            testFunc(options, contextBuilder);
+            await testFunc(options, contextBuilder);
           } finally {
             // Restore original font
             Flow.setMusicFont(...originalFontNames);
@@ -96,7 +101,7 @@ describe('KeySignature', () => {
     assert.ok(true, 'all pass');
   });
 
-  runTest('Major Key Test', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Major Key Test', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const w = fontWidths();
     const accidentalCount = 28; // total number in all the keys
@@ -126,10 +131,12 @@ describe('KeySignature', () => {
     stave2.setContext(ctx);
     stave2.draw();
 
+    await expectMatchingScreenshot(options, 'keysignature_tests.test.ts');
+
     assert.ok(true, 'all pass');
   });
 
-  runTest('Minor Key Test', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Minor Key Test', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const accidentalCount = 28; // total number in all the keys
     const w = fontWidths();
@@ -159,10 +166,12 @@ describe('KeySignature', () => {
     stave2.setContext(ctx);
     stave2.draw();
 
+    await expectMatchingScreenshot(options, 'keysignature_tests.test.ts');
+
     assert.ok(true, 'all pass');
   });
 
-  runTest('Stave Helper', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Stave Helper', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const w = fontWidths();
     const accidentalCount = 28; // total number in all the keys
@@ -189,10 +198,12 @@ describe('KeySignature', () => {
     stave2.setContext(ctx);
     stave2.draw();
 
+    await expectMatchingScreenshot(options, 'keysignature_tests.test.ts');
+
     assert.ok(true, 'all pass');
   });
 
-  runTest('Cancelled key test', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Cancelled key test', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const scale = 0.9;
     const w = fontWidths();
@@ -258,10 +269,12 @@ describe('KeySignature', () => {
     stave4.setContext(ctx);
     stave4.draw();
 
+    await expectMatchingScreenshot(options, 'keysignature_tests.test.ts');
+
     assert.ok(true, 'all pass');
   });
 
-  runTest('Cancelled key (for each clef) test', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Cancelled key (for each clef) test', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const scale = 0.8;
     const w = fontWidths();
@@ -299,10 +312,12 @@ describe('KeySignature', () => {
       y += 80;
     });
 
+    await expectMatchingScreenshot(options, 'keysignature_tests.test.ts');
+
     assert.ok(true, 'all pass');
   });
 
-  runTest('Altered key test', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Altered key test', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const ctx = contextBuilder(options.elementId, 780, 500);
     ctx.scale(0.9, 0.9);
@@ -352,10 +367,12 @@ describe('KeySignature', () => {
     stave4.setContext(ctx);
     stave4.draw();
 
+    await expectMatchingScreenshot(options, 'keysignature_tests.test.ts');
+
     assert.ok(true, 'all pass');
   });
 
-  runTest('End key with clef test', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('End key with clef test', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const ctx = contextBuilder(options.elementId, 400, 200);
     ctx.scale(0.9, 0.9);
@@ -373,12 +390,15 @@ describe('KeySignature', () => {
 
     stave1.setContext(ctx).draw();
     stave2.setContext(ctx).draw();
+
+    await expectMatchingScreenshot(options, 'keysignature_tests.test.ts');
+
     assert.ok(true, 'all pass');
   });
 
-  runTest('Key Signature Change test', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Key Signature Change test', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 900);
+    const f = makeFactory(options.backend, options.elementId, 900, undefined, options);
 
     // The previous code was buggy: f.Stave(10, 10, 800), even though Factory.Stave() only accepts 1 argument.
     const stave = f.Stave({ x: 10, y: 10, width: 800 }).addClef('treble').addTimeSignature('C|');
@@ -404,12 +424,14 @@ describe('KeySignature', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'keysignature_tests.test.ts');
+
     assert.ok(true, 'all pass');
   });
 
-  runTest('Key Signature with/without clef symbol', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Key Signature with/without clef symbol', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 900);
+    const f = makeFactory(options.backend, options.elementId, 900, undefined, options);
     const stave = f.Stave({ x: 10, y: 10, width: 800 }).addClef('bass').addTimeSignature('C|').setClefLines('bass');
 
     const voice = f
@@ -432,6 +454,8 @@ describe('KeySignature', () => {
     f.Formatter().joinVoices([voice]).formatToStave([voice], stave);
 
     f.draw();
+
+    await expectMatchingScreenshot(options, 'keysignature_tests.test.ts');
 
     assert.ok(true, 'all pass');
   });

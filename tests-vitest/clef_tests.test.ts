@@ -8,13 +8,13 @@ import { describe, test } from 'vitest';
 import { Factory } from '../src/factory';
 import { Flow } from '../src/flow';
 import { Renderer } from '../src/renderer';
-import { createAssert, FONT_STACKS, generateTestID, TestOptions } from './vitest_test_helpers';
+import { createAssert, expectMatchingScreenshot, FONT_STACKS, generateTestID, TestOptions } from './vitest_test_helpers';
 
 describe('Clef', () => {
   // Helper function to run a test with multiple backends and font stacks
-  function runTest(
+  async function runTest(
     testName: string,
-    testFunc: (options: TestOptions) => void,
+    testFunc: (options: TestOptions) => void | Promise<void>,
     backends: Array<{ backend: number; fontStacks: string[] }> = [
       { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
       { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
@@ -22,7 +22,7 @@ describe('Clef', () => {
   ) {
     backends.forEach(({ backend, fontStacks }) => {
       fontStacks.forEach((fontStackName) => {
-        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, async () => {
           const elementId = generateTestID('clef_test');
 
           // Create the DOM element before the test runs
@@ -31,14 +31,20 @@ describe('Clef', () => {
           element.id = elementId;
           document.body.appendChild(element);
 
-          const options: TestOptions = { elementId, params: {}, backend };
+          const options: TestOptions = {
+            elementId,
+            params: {},
+            backend,
+            testName,
+            fontStackName,
+          };
 
           // Set font stack
           const originalFontNames = Flow.getMusicFont();
           Flow.setMusicFont(...FONT_STACKS[fontStackName]);
 
           try {
-            testFunc(options);
+            await testFunc(options);
           } finally {
             // Restore original font
             Flow.setMusicFont(...originalFontNames);
@@ -50,7 +56,7 @@ describe('Clef', () => {
     });
   }
 
-  runTest('Clef Test', (options: TestOptions) => {
+  runTest('Clef Test', async (options: TestOptions) => {
     const f = new Factory({
       renderer: { elementId: options.elementId, backend: options.backend, width: 800, height: 120 },
     });
@@ -71,10 +77,13 @@ describe('Clef', () => {
       .addClef('french')
       .addEndClef('treble');
     f.draw();
+
+    await expectMatchingScreenshot(options, 'clef_tests.test.ts');
+
     createAssert().ok(true, 'all pass');
   });
 
-  runTest('Clef End Test', (options: TestOptions) => {
+  runTest('Clef End Test', async (options: TestOptions) => {
     const f = new Factory({
       renderer: { elementId: options.elementId, backend: options.backend, width: 800, height: 120 },
     });
@@ -95,10 +104,13 @@ describe('Clef', () => {
       .addEndClef('percussion')
       .addEndClef('french');
     f.draw();
+
+    await expectMatchingScreenshot(options, 'clef_tests.test.ts');
+
     createAssert().ok(true, 'all pass');
   });
 
-  runTest('Small Clef Test', (options: TestOptions) => {
+  runTest('Small Clef Test', async (options: TestOptions) => {
     const f = new Factory({
       renderer: { elementId: options.elementId, backend: options.backend, width: 800, height: 120 },
     });
@@ -119,10 +131,13 @@ describe('Clef', () => {
       .addClef('french', 'small')
       .addEndClef('treble', 'small');
     f.draw();
+
+    await expectMatchingScreenshot(options, 'clef_tests.test.ts');
+
     createAssert().ok(true, 'all pass');
   });
 
-  runTest('Small Clef End Test', (options: TestOptions) => {
+  runTest('Small Clef End Test', async (options: TestOptions) => {
     const f = new Factory({
       renderer: { elementId: options.elementId, backend: options.backend, width: 800, height: 120 },
     });
@@ -143,10 +158,13 @@ describe('Clef', () => {
       .addEndClef('percussion', 'small')
       .addEndClef('french', 'small');
     f.draw();
+
+    await expectMatchingScreenshot(options, 'clef_tests.test.ts');
+
     createAssert().ok(true, 'all pass');
   });
 
-  runTest('Clef Change Test', (options: TestOptions) => {
+  runTest('Clef Change Test', async (options: TestOptions) => {
     const f = new Factory({
       renderer: { elementId: options.elementId, backend: options.backend, width: 800, height: 180 },
     });
@@ -179,6 +197,9 @@ describe('Clef', () => {
     const voice = f.Voice({ time: '12/4' }).addTickables(notes);
     f.Formatter().joinVoices([voice]).formatToStave([voice], stave);
     f.draw();
+
+    await expectMatchingScreenshot(options, 'clef_tests.test.ts');
+
     createAssert().ok(true, 'all pass');
   });
 });

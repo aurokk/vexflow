@@ -19,13 +19,20 @@ import { Stem } from '../src/stem';
 import { TabNote } from '../src/tabnote';
 import { TabStave } from '../src/tabstave';
 import { Voice } from '../src/voice';
-import { createAssert, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
+import {
+  createAssert,
+  expectMatchingScreenshot,
+  FONT_STACKS,
+  generateTestID,
+  makeFactory,
+  TestOptions,
+} from './vitest_test_helpers';
 
 describe('Articulation', () => {
   // Helper function to run a test with multiple backends and font stacks
-  function runTest(
+  async function runTest(
     testName: string,
-    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void | Promise<void>,
     backends: Array<{ backend: number; fontStacks: string[] }> = [
       { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
       { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
@@ -33,7 +40,7 @@ describe('Articulation', () => {
   ) {
     backends.forEach(({ backend, fontStacks }) => {
       fontStacks.forEach((fontStackName) => {
-        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, async () => {
           const elementId = generateTestID('articulation_test');
 
           // Create the DOM element before the test runs
@@ -42,7 +49,13 @@ describe('Articulation', () => {
           element.id = elementId;
           document.body.appendChild(element);
 
-          const options: TestOptions = { elementId, params: {}, backend };
+          const options: TestOptions = {
+            elementId,
+            params: {},
+            backend,
+            testName,
+            fontStackName,
+          };
 
           // Set font stack
           const originalFontNames = Flow.getMusicFont();
@@ -51,7 +64,7 @@ describe('Articulation', () => {
           try {
             const contextBuilder: ContextBuilder =
               backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
-            testFunc(options, contextBuilder);
+            await testFunc(options, contextBuilder);
           } finally {
             // Restore original font
             Flow.setMusicFont(...originalFontNames);
@@ -64,9 +77,9 @@ describe('Articulation', () => {
   }
 
   // Helper function for tests with parameters
-  function runTestWithParams(
+  async function runTestWithParams(
     testName: string,
-    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void | Promise<void>,
     params: any,
     backends: Array<{ backend: number; fontStacks: string[] }> = [
       { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
@@ -75,7 +88,7 @@ describe('Articulation', () => {
   ) {
     backends.forEach(({ backend, fontStacks }) => {
       fontStacks.forEach((fontStackName) => {
-        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, async () => {
           const elementId = generateTestID('articulation_test');
 
           // Create the DOM element before the test runs
@@ -84,7 +97,13 @@ describe('Articulation', () => {
           element.id = elementId;
           document.body.appendChild(element);
 
-          const options: TestOptions = { elementId, params, backend };
+          const options: TestOptions = {
+            elementId,
+            params,
+            backend,
+            testName,
+            fontStackName,
+          };
 
           // Set font stack
           const originalFontNames = Flow.getMusicFont();
@@ -93,7 +112,7 @@ describe('Articulation', () => {
           try {
             const contextBuilder: ContextBuilder =
               backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
-            testFunc(options, contextBuilder);
+            await testFunc(options, contextBuilder);
           } finally {
             // Restore original font
             Flow.setMusicFont(...originalFontNames);
@@ -105,7 +124,7 @@ describe('Articulation', () => {
     });
   }
 
-  runTest('Articulation - Vertical Placement', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Articulation - Vertical Placement', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const ctx = contextBuilder(options.elementId, 750, 300);
 
@@ -164,10 +183,13 @@ describe('Articulation', () => {
     ];
 
     Formatter.FormatAndDraw(ctx, stave, notes);
+
+    await expectMatchingScreenshot(options, 'articulation_tests.test.ts');
+
     assert.ok(true, ' Annotation Placement');
   });
 
-  runTest('Articulation - Vertical Placement (Glyph codes)', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Articulation - Vertical Placement (Glyph codes)', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const ctx = contextBuilder(options.elementId, 750, 300);
 
@@ -226,17 +248,20 @@ describe('Articulation', () => {
     ];
 
     Formatter.FormatAndDraw(ctx, stave, notes);
+
+    await expectMatchingScreenshot(options, 'articulation_tests.test.ts');
+
     assert.ok(true, ' Annotation Placement (Glyph codes)');
   });
 
   runTestWithParams(
     'Articulation - Staccato/Staccatissimo',
-    (options: TestOptions, contextBuilder: ContextBuilder) => {
+    async (options: TestOptions, contextBuilder: ContextBuilder) => {
       const assert = createAssert();
       const sym1 = options.params.sym1;
       const sym2 = options.params.sym2;
       const width = 125 - Stave.defaultPadding;
-      const f = makeFactory(options.backend, options.elementId, 675, 195);
+      const f = makeFactory(options.backend, options.elementId, 675, 195, options);
       const ctx = f.getContext();
       let x = 10;
       const y = 30;
@@ -311,6 +336,9 @@ describe('Articulation', () => {
       notesBar4[3].addModifier(new Articulation(sym2).setPosition(4), 0);
 
       formatAndDrawToWidth(x, y, width, notesBar4, Barline.type.END);
+
+      await expectMatchingScreenshot(options, 'articulation_tests.test.ts');
+
       assert.ok(true);
     },
     { sym1: 'a.', sym2: 'av' }
@@ -318,12 +346,12 @@ describe('Articulation', () => {
 
   runTestWithParams(
     'Articulation - Accent/Tenuto',
-    (options: TestOptions, contextBuilder: ContextBuilder) => {
+    async (options: TestOptions, contextBuilder: ContextBuilder) => {
       const assert = createAssert();
       const sym1 = options.params.sym1;
       const sym2 = options.params.sym2;
       const width = 125 - Stave.defaultPadding;
-      const f = makeFactory(options.backend, options.elementId, 675, 195);
+      const f = makeFactory(options.backend, options.elementId, 675, 195, options);
       const ctx = f.getContext();
       let x = 10;
       const y = 30;
@@ -398,6 +426,9 @@ describe('Articulation', () => {
       notesBar4[3].addModifier(new Articulation(sym2).setPosition(4), 0);
 
       formatAndDrawToWidth(x, y, width, notesBar4, Barline.type.END);
+
+      await expectMatchingScreenshot(options, 'articulation_tests.test.ts');
+
       assert.ok(true);
     },
     { sym1: 'a>', sym2: 'a-' }
@@ -405,12 +436,12 @@ describe('Articulation', () => {
 
   runTestWithParams(
     'Articulation - Marcato/L.H. Pizzicato',
-    (options: TestOptions, contextBuilder: ContextBuilder) => {
+    async (options: TestOptions, contextBuilder: ContextBuilder) => {
       const assert = createAssert();
       const sym1 = options.params.sym1;
       const sym2 = options.params.sym2;
       const width = 125 - Stave.defaultPadding;
-      const f = makeFactory(options.backend, options.elementId, 675, 195);
+      const f = makeFactory(options.backend, options.elementId, 675, 195, options);
       const ctx = f.getContext();
       let x = 10;
       const y = 30;
@@ -485,6 +516,9 @@ describe('Articulation', () => {
       notesBar4[3].addModifier(new Articulation(sym2).setPosition(4), 0);
 
       formatAndDrawToWidth(x, y, width, notesBar4, Barline.type.END);
+
+      await expectMatchingScreenshot(options, 'articulation_tests.test.ts');
+
       assert.ok(true);
     },
     { sym1: 'a^', sym2: 'a+' }
@@ -492,12 +526,12 @@ describe('Articulation', () => {
 
   runTestWithParams(
     'Articulation - Snap Pizzicato/Fermata',
-    (options: TestOptions, contextBuilder: ContextBuilder) => {
+    async (options: TestOptions, contextBuilder: ContextBuilder) => {
       const assert = createAssert();
       const sym1 = options.params.sym1;
       const sym2 = options.params.sym2;
       const width = 125 - Stave.defaultPadding;
-      const f = makeFactory(options.backend, options.elementId, 675, 195);
+      const f = makeFactory(options.backend, options.elementId, 675, 195, options);
       const ctx = f.getContext();
       let x = 10;
       const y = 30;
@@ -572,6 +606,9 @@ describe('Articulation', () => {
       notesBar4[3].addModifier(new Articulation(sym2).setPosition(4), 0);
 
       formatAndDrawToWidth(x, y, width, notesBar4, Barline.type.END);
+
+      await expectMatchingScreenshot(options, 'articulation_tests.test.ts');
+
       assert.ok(true);
     },
     { sym1: 'ao', sym2: 'ao' }
@@ -579,12 +616,12 @@ describe('Articulation', () => {
 
   runTestWithParams(
     'Articulation - Up-stroke/Down-Stroke',
-    (options: TestOptions, contextBuilder: ContextBuilder) => {
+    async (options: TestOptions, contextBuilder: ContextBuilder) => {
       const assert = createAssert();
       const sym1 = options.params.sym1;
       const sym2 = options.params.sym2;
       const width = 125 - Stave.defaultPadding;
-      const f = makeFactory(options.backend, options.elementId, 675, 195);
+      const f = makeFactory(options.backend, options.elementId, 675, 195, options);
       const ctx = f.getContext();
       let x = 10;
       const y = 30;
@@ -659,6 +696,9 @@ describe('Articulation', () => {
       notesBar4[3].addModifier(new Articulation(sym2).setPosition(4), 0);
 
       formatAndDrawToWidth(x, y, width, notesBar4, Barline.type.END);
+
+      await expectMatchingScreenshot(options, 'articulation_tests.test.ts');
+
       assert.ok(true);
     },
     { sym1: 'a|', sym2: 'am' }
@@ -666,11 +706,11 @@ describe('Articulation', () => {
 
   runTestWithParams(
     'Articulation - Fermata Above/Below',
-    (options: TestOptions, contextBuilder: ContextBuilder) => {
+    async (options: TestOptions, contextBuilder: ContextBuilder) => {
       const assert = createAssert();
       const sym1 = options.params.sym1;
       const sym2 = options.params.sym2;
-      const f = makeFactory(options.backend, options.elementId, 400, 195);
+      const f = makeFactory(options.backend, options.elementId, 400, 195, options);
       const ctx = f.getContext();
       const score = f.EasyScore();
       const width = 150 - Stave.defaultPadding;
@@ -717,6 +757,9 @@ describe('Articulation', () => {
       notesBar2[3].addModifier(new Articulation(sym2).setPosition(4), 0);
 
       formatAndDrawToWidth(x, y, width, notesBar2, Barline.type.DOUBLE);
+
+      await expectMatchingScreenshot(options, 'articulation_tests.test.ts');
+
       assert.ok(true);
     },
     { sym1: 'a@a', sym2: 'a@u' }
@@ -724,11 +767,11 @@ describe('Articulation', () => {
 
   runTestWithParams(
     'Articulation - Fermata Short Above/Below',
-    (options: TestOptions, contextBuilder: ContextBuilder) => {
+    async (options: TestOptions, contextBuilder: ContextBuilder) => {
       const assert = createAssert();
       const sym1 = options.params.sym1;
       const sym2 = options.params.sym2;
-      const f = makeFactory(options.backend, options.elementId, 400, 195);
+      const f = makeFactory(options.backend, options.elementId, 400, 195, options);
       const ctx = f.getContext();
       const score = f.EasyScore();
       const width = 150 - Stave.defaultPadding;
@@ -775,6 +818,9 @@ describe('Articulation', () => {
       notesBar2[3].addModifier(new Articulation(sym2).setPosition(4), 0);
 
       formatAndDrawToWidth(x, y, width, notesBar2, Barline.type.DOUBLE);
+
+      await expectMatchingScreenshot(options, 'articulation_tests.test.ts');
+
       assert.ok(true);
     },
     { sym1: 'a@as', sym2: 'a@us' }
@@ -782,11 +828,11 @@ describe('Articulation', () => {
 
   runTestWithParams(
     'Articulation - Fermata Long Above/Below',
-    (options: TestOptions, contextBuilder: ContextBuilder) => {
+    async (options: TestOptions, contextBuilder: ContextBuilder) => {
       const assert = createAssert();
       const sym1 = options.params.sym1;
       const sym2 = options.params.sym2;
-      const f = makeFactory(options.backend, options.elementId, 400, 195);
+      const f = makeFactory(options.backend, options.elementId, 400, 195, options);
       const ctx = f.getContext();
       const score = f.EasyScore();
       const width = 150 - Stave.defaultPadding;
@@ -833,6 +879,9 @@ describe('Articulation', () => {
       notesBar2[3].addModifier(new Articulation(sym2).setPosition(4), 0);
 
       formatAndDrawToWidth(x, y, width, notesBar2, Barline.type.DOUBLE);
+
+      await expectMatchingScreenshot(options, 'articulation_tests.test.ts');
+
       assert.ok(true);
     },
     { sym1: 'a@al', sym2: 'a@ul' }
@@ -840,11 +889,11 @@ describe('Articulation', () => {
 
   runTestWithParams(
     'Articulation - Fermata Very Long Above/Below',
-    (options: TestOptions, contextBuilder: ContextBuilder) => {
+    async (options: TestOptions, contextBuilder: ContextBuilder) => {
       const assert = createAssert();
       const sym1 = options.params.sym1;
       const sym2 = options.params.sym2;
-      const f = makeFactory(options.backend, options.elementId, 400, 195);
+      const f = makeFactory(options.backend, options.elementId, 400, 195, options);
       const ctx = f.getContext();
       const score = f.EasyScore();
       const width = 150 - Stave.defaultPadding;
@@ -891,6 +940,9 @@ describe('Articulation', () => {
       notesBar2[3].addModifier(new Articulation(sym2).setPosition(4), 0);
 
       formatAndDrawToWidth(x, y, width, notesBar2, Barline.type.DOUBLE);
+
+      await expectMatchingScreenshot(options, 'articulation_tests.test.ts');
+
       assert.ok(true);
     },
     { sym1: 'a@avl', sym2: 'a@uvl' }
@@ -898,10 +950,10 @@ describe('Articulation', () => {
 
   runTestWithParams(
     'Articulation - Inline/Multiple',
-    (options: TestOptions, contextBuilder: ContextBuilder) => {
+    async (options: TestOptions, contextBuilder: ContextBuilder) => {
       const assert = createAssert();
       const scale = 0.8;
-      const f = makeFactory(options.backend, options.elementId, 1500, 195);
+      const f = makeFactory(options.backend, options.elementId, 1500, 195, options);
 
       const ctx = f.getContext();
       ctx.scale(scale, scale);
@@ -1003,6 +1055,9 @@ describe('Articulation', () => {
       }
 
       Formatter.FormatAndDraw(ctx, stave4, notesBar4);
+
+      await expectMatchingScreenshot(options, 'articulation_tests.test.ts');
+
       assert.ok(true);
     },
     { sym1: 'a.', sym2: 'a.' }
@@ -1010,7 +1065,7 @@ describe('Articulation', () => {
 
   runTestWithParams(
     'TabNote Articulation',
-    (options: TestOptions, contextBuilder: ContextBuilder) => {
+    async (options: TestOptions, contextBuilder: ContextBuilder) => {
       const assert = createAssert();
       const ctx = contextBuilder(options.elementId, 600, 200);
       ctx.font = '10pt ' + Font.SANS_SERIF;
@@ -1088,6 +1143,8 @@ describe('Articulation', () => {
       new Formatter().joinVoices([voice]).formatToStave([voice], stave);
 
       voice.draw(ctx, stave);
+
+      await expectMatchingScreenshot(options, 'articulation_tests.test.ts');
 
       assert.ok(true, 'TabNotes successfully drawn');
     },

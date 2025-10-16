@@ -9,14 +9,14 @@ import { Flow } from '../src/flow';
 import { Font } from '../src/font';
 import { MultimeasureRestRenderOptions } from '../src/multimeasurerest';
 import { ContextBuilder, Renderer } from '../src/renderer';
-import { createAssert, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
+import { createAssert, expectMatchingScreenshot, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
 
 
 describe('MultiMeasureRest', () => {
   // Helper function to run a test with multiple backends and font stacks
-  function runTest(
+  async function runTest(
     testName: string,
-    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void | Promise<void>,
     backends: Array<{ backend: number; fontStacks: string[] }> = [
       { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
       { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
@@ -24,7 +24,7 @@ describe('MultiMeasureRest', () => {
   ) {
     backends.forEach(({ backend, fontStacks }) => {
       fontStacks.forEach((fontStackName) => {
-        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, async () => {
           const elementId = generateTestID('multimeasurerest_test');
 
           // Create the DOM element before the test runs
@@ -33,8 +33,13 @@ describe('MultiMeasureRest', () => {
           element.id = elementId;
           document.body.appendChild(element);
 
-          const assert = createAssert();
-          const options: TestOptions = { elementId, params: {}, backend };
+          const options: TestOptions = {
+            elementId,
+            params: {},
+            backend,
+            testName,
+            fontStackName,
+          };
 
           // Set font stack
           const originalFontNames = Flow.getMusicFont();
@@ -43,7 +48,7 @@ describe('MultiMeasureRest', () => {
           try {
             const contextBuilder: ContextBuilder =
               backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
-            testFunc(options, contextBuilder);
+            await testFunc(options, contextBuilder);
           } finally {
             // Restore original font
             Flow.setMusicFont(...originalFontNames);
@@ -55,10 +60,10 @@ describe('MultiMeasureRest', () => {
     });
   }
 
-  runTest('Simple Test', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Simple Test', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const width = 910;
-    const f = makeFactory(options.backend, options.elementId, width, 300);
+    const f = makeFactory(options.backend, options.elementId, width, 300, options);
     const line_spacing_15px = { options: { spacing_between_lines_px: 15 } };
 
     // Each item below is an array that contains:
@@ -139,13 +144,15 @@ describe('MultiMeasureRest', () => {
     context.fillText(str, xs.left + (xs.right - xs.left) * 0.5 - metrics.width * 0.5, strY);
     context.restore();
 
+    await expectMatchingScreenshot(options, 'multimeasurerest_tests.test.ts');
+
     assert.ok(true, 'Simple Test');
   });
 
-  runTest('Stave with modifiers Test', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Stave with modifiers Test', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const width = 910;
-    const f = makeFactory(options.backend, options.elementId, width, 200);
+    const f = makeFactory(options.backend, options.elementId, width, 200, options);
     let x = 0;
     let y = 0;
 
@@ -201,6 +208,8 @@ describe('MultiMeasureRest', () => {
     });
 
     f.draw();
+
+    await expectMatchingScreenshot(options, 'multimeasurerest_tests.test.ts');
 
     assert.ok(true, 'Stave with modifiers Test');
   });

@@ -13,7 +13,7 @@ import { Renderer, ContextBuilder } from '../src/renderer';
 import { Stave } from '../src/stave';
 import { Stem } from '../src/stem';
 import { StemmableNote } from '../src/stemmablenote';
-import { createAssert, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
+import { createAssert, expectMatchingScreenshot, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
 
 // Helper to flatten arrays
 const concat = <T>(a: T[], b: T[]): T[] => a.concat(b);
@@ -29,9 +29,9 @@ function createShortcuts(score: EasyScore) {
 }
 
 describe('Auto-Beaming', () => {
-  function runTest(
+  async function runTest(
     testName: string,
-    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void | Promise<void>,
     backends: Array<{ backend: number; fontStacks: string[] }> = [
       { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
       { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
@@ -39,21 +39,21 @@ describe('Auto-Beaming', () => {
   ) {
     backends.forEach(({ backend, fontStacks }) => {
       fontStacks.forEach((fontStackName) => {
-        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, async () => {
           const elementId = generateTestID('auto_beam_test');
           const tagName = backend === Renderer.Backends.SVG ? 'div' : 'canvas';
           const element = document.createElement(tagName);
           element.id = elementId;
           document.body.appendChild(element);
 
-          const options: TestOptions = { elementId, params: {}, backend };
+          const options: TestOptions = { elementId, params: {}, backend, testName, fontStackName };
           const originalFontNames = Flow.getMusicFont();
           Flow.setMusicFont(...FONT_STACKS[fontStackName]);
 
           try {
             const contextBuilder: ContextBuilder =
               backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
-            testFunc(options, contextBuilder);
+            await testFunc(options, contextBuilder);
           } finally {
             Flow.setMusicFont(...originalFontNames);
           }
@@ -62,9 +62,9 @@ describe('Auto-Beaming', () => {
     });
   }
 
-  runTest('Simple Auto Beaming', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Simple Auto Beaming', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 450, 140);
+    const f = makeFactory(options.backend, options.elementId, 450, 140, options);
     const stave = f.Stave();
     const score = f.EasyScore();
 
@@ -78,14 +78,18 @@ describe('Auto-Beaming', () => {
 
     f.draw();
 
+
     beams.forEach((beam) => beam.setContext(f.getContext()).draw());
+
+    await expectMatchingScreenshot(options, 'auto_beam_formatting_tests.test.ts');
+
 
     assert.ok(true, 'Auto Beaming Applicator Test');
   });
 
-  runTest('Auto Beaming With Overflow Group', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Auto Beaming With Overflow Group', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 450, 140);
+    const f = makeFactory(options.backend, options.elementId, 450, 140, options);
     const stave = f.Stave();
     const score = f.EasyScore();
 
@@ -99,14 +103,18 @@ describe('Auto-Beaming', () => {
 
     f.draw();
 
+
     beams.forEach((beam) => beam.setContext(f.getContext()).draw());
+
+    await expectMatchingScreenshot(options, 'auto_beam_formatting_tests.test.ts');
+
 
     assert.ok(true, 'Auto Beaming Applicator Test');
   });
 
-  runTest('Even Group Stem Directions', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Even Group Stem Directions', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 450, 140);
+    const f = makeFactory(options.backend, options.elementId, 450, 140, options);
     const stave = f.Stave();
     const score = f.EasyScore();
 
@@ -118,7 +126,11 @@ describe('Auto-Beaming', () => {
 
     f.draw();
 
+
     beams.forEach((beam) => beam.setContext(f.getContext()).draw());
+
+    await expectMatchingScreenshot(options, 'auto_beam_formatting_tests.test.ts');
+
 
     assert.equal(beams[0].getStemDirection(), Stem.UP);
     assert.equal(beams[1].getStemDirection(), Stem.UP);
@@ -130,9 +142,9 @@ describe('Auto-Beaming', () => {
     assert.ok(true, 'Auto Beaming Applicator Test');
   });
 
-  runTest('Odd Group Stem Directions', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Odd Group Stem Directions', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 450, 140);
+    const f = makeFactory(options.backend, options.elementId, 450, 140, options);
     const stave = f.Stave();
     const score = f.EasyScore();
 
@@ -152,14 +164,17 @@ describe('Auto-Beaming', () => {
 
     f.draw();
 
+
     beams.forEach((beam) => beam.setContext(f.getContext()).draw());
+
+    await expectMatchingScreenshot(options, 'auto_beam_formatting_tests.test.ts');
 
     assert.ok(true, 'Auto Beaming Applicator Test');
   });
 
-  runTest('Odd Beam Groups Auto Beaming', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Odd Beam Groups Auto Beaming', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 450, 140);
+    const f = makeFactory(options.backend, options.elementId, 450, 140, options);
     const stave = f.Stave();
     const score = f.EasyScore();
 
@@ -173,14 +188,17 @@ describe('Auto-Beaming', () => {
 
     f.draw();
 
+
     beams.forEach((beam) => beam.setContext(f.getContext()).draw());
+
+    await expectMatchingScreenshot(options, 'auto_beam_formatting_tests.test.ts');
 
     assert.ok(true, 'Auto Beam Applicator Test');
   });
 
-  runTest('More Simple Auto Beaming 0', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('More Simple Auto Beaming 0', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 450, 140);
+    const f = makeFactory(options.backend, options.elementId, 450, 140, options);
     const stave = f.Stave();
     const score = f.EasyScore();
 
@@ -192,14 +210,17 @@ describe('Auto-Beaming', () => {
 
     f.draw();
 
+
     beams.forEach((beam) => beam.setContext(f.getContext()).draw());
+
+    await expectMatchingScreenshot(options, 'auto_beam_formatting_tests.test.ts');
 
     assert.ok(true, 'Auto Beam Applicator Test');
   });
 
-  runTest('More Simple Auto Beaming 1', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('More Simple Auto Beaming 1', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 450, 140);
+    const f = makeFactory(options.backend, options.elementId, 450, 140, options);
     const stave = f.Stave();
     const score = f.EasyScore();
 
@@ -214,14 +235,17 @@ describe('Auto-Beaming', () => {
 
     f.draw();
 
+
     beams.forEach((beam) => beam.setContext(f.getContext()).draw());
+
+    await expectMatchingScreenshot(options, 'auto_beam_formatting_tests.test.ts');
 
     assert.ok(true, 'Auto Beam Applicator Test');
   });
 
-  runTest('Beam Across All Rests', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Beam Across All Rests', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 450, 140);
+    const f = makeFactory(options.backend, options.elementId, 450, 140, options);
     const stave = f.Stave();
     const score = f.EasyScore();
 
@@ -238,14 +262,17 @@ describe('Auto-Beaming', () => {
 
     f.draw();
 
+
     beams.forEach((beam) => beam.setContext(f.getContext()).draw());
+
+    await expectMatchingScreenshot(options, 'auto_beam_formatting_tests.test.ts');
 
     assert.ok(true, 'Auto Beam Applicator Test');
   });
 
-  runTest('Beam Across All Rests with Stemlets', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Beam Across All Rests with Stemlets', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 450, 140);
+    const f = makeFactory(options.backend, options.elementId, 450, 140, options);
     const stave = f.Stave();
     const score = f.EasyScore();
 
@@ -263,14 +290,17 @@ describe('Auto-Beaming', () => {
 
     f.draw();
 
+
     beams.forEach((beam) => beam.setContext(f.getContext()).draw());
+
+    await expectMatchingScreenshot(options, 'auto_beam_formatting_tests.test.ts');
 
     assert.ok(true, 'Auto Beam Applicator Test');
   });
 
-  runTest('Break Beams on Middle Rests Only', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Break Beams on Middle Rests Only', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 450, 140);
+    const f = makeFactory(options.backend, options.elementId, 450, 140, options);
     const stave = f.Stave();
     const score = f.EasyScore();
 
@@ -288,14 +318,17 @@ describe('Auto-Beaming', () => {
 
     f.draw();
 
+
     beams.forEach((beam) => beam.setContext(f.getContext()).draw());
+
+    await expectMatchingScreenshot(options, 'auto_beam_formatting_tests.test.ts');
 
     assert.ok(true, 'Auto Beam Applicator Test');
   });
 
-  runTest('Break Beams on Rest', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Break Beams on Rest', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 450, 140);
+    const f = makeFactory(options.backend, options.elementId, 450, 140, options);
     const stave = f.Stave();
     const score = f.EasyScore();
 
@@ -312,14 +345,17 @@ describe('Auto-Beaming', () => {
 
     f.draw();
 
+
     beams.forEach((beam) => beam.setContext(f.getContext()).draw());
+
+    await expectMatchingScreenshot(options, 'auto_beam_formatting_tests.test.ts');
 
     assert.ok(true, 'Auto Beam Applicator Test');
   });
 
-  runTest('Maintain Stem Directions', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Maintain Stem Directions', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 450, 200);
+    const f = makeFactory(options.backend, options.elementId, 450, 200, options);
     const stave = f.Stave();
     const score = f.EasyScore();
 
@@ -345,14 +381,17 @@ describe('Auto-Beaming', () => {
 
     f.draw();
 
+
     beams.forEach((beam) => beam.setContext(f.getContext()).draw());
+
+    await expectMatchingScreenshot(options, 'auto_beam_formatting_tests.test.ts');
 
     assert.ok(true, 'Auto Beam Applicator Test');
   });
 
-  runTest('Maintain Stem Directions - Beam Over Rests', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Maintain Stem Directions - Beam Over Rests', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 450, 200);
+    const f = makeFactory(options.backend, options.elementId, 450, 200, options);
     const stave = f.Stave();
     const score = f.EasyScore();
 
@@ -378,14 +417,17 @@ describe('Auto-Beaming', () => {
 
     f.draw();
 
+
     beams.forEach((beam) => beam.setContext(f.getContext()).draw());
+
+    await expectMatchingScreenshot(options, 'auto_beam_formatting_tests.test.ts');
 
     assert.ok(true, 'Auto Beam Applicator Test');
   });
 
-  runTest('Beat group with unbeamable note - 2/2', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Beat group with unbeamable note - 2/2', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 450, 200);
+    const f = makeFactory(options.backend, options.elementId, 450, 200, options);
     const stave = f.Stave().addTimeSignature('2/4');
     const score = f.EasyScore();
 
@@ -401,14 +443,17 @@ describe('Auto-Beaming', () => {
 
     f.draw();
 
+
     beams.forEach((beam) => beam.setContext(f.getContext()).draw());
+
+    await expectMatchingScreenshot(options, 'auto_beam_formatting_tests.test.ts');
 
     assert.ok(true, 'Auto Beam Applicator Test');
   });
 
-  runTest('Offset beat grouping - 6/8 ', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Offset beat grouping - 6/8 ', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 450, 200);
+    const f = makeFactory(options.backend, options.elementId, 450, 200, options);
     const stave = f.Stave().addTimeSignature('6/8');
     const score = f.EasyScore();
 
@@ -424,14 +469,17 @@ describe('Auto-Beaming', () => {
 
     f.draw();
 
+
     beams.forEach((beam) => beam.setContext(f.getContext()).draw());
+
+    await expectMatchingScreenshot(options, 'auto_beam_formatting_tests.test.ts');
 
     assert.ok(true, 'Auto Beam Applicator Test');
   });
 
-  runTest('Odd Time - Guessing Default Beam Groups', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Odd Time - Guessing Default Beam Groups', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 450, 400);
+    const f = makeFactory(options.backend, options.elementId, 450, 400, options);
     const score = f.EasyScore();
 
     const stave1 = f.Stave({ y: 10 }).addTimeSignature('5/4');
@@ -456,14 +504,17 @@ describe('Auto-Beaming', () => {
 
     f.draw();
 
+
     beams.forEach((beam) => beam.setContext(f.getContext()).draw());
+
+    await expectMatchingScreenshot(options, 'auto_beam_formatting_tests.test.ts');
 
     assert.ok(true, 'Auto Beam Applicator Test');
   });
 
-  runTest('Custom Beam Groups', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Custom Beam Groups', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 450, 400);
+    const f = makeFactory(options.backend, options.elementId, 450, 400, options);
     const score = f.EasyScore();
 
     const stave1 = f.Stave({ y: 10 }).addTimeSignature('5/4');
@@ -492,14 +543,17 @@ describe('Auto-Beaming', () => {
 
     f.draw();
 
+
     beams.forEach((beam) => beam.setContext(f.getContext()).draw());
+
+    await expectMatchingScreenshot(options, 'auto_beam_formatting_tests.test.ts');
 
     assert.ok(true, 'Auto Beam Applicator Test');
   });
 
-  runTest('Simple Tuplet Auto Beaming', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Simple Tuplet Auto Beaming', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 450, 140);
+    const f = makeFactory(options.backend, options.elementId, 450, 140, options);
     const stave = f.Stave();
     const score = f.EasyScore();
 
@@ -520,14 +574,17 @@ describe('Auto-Beaming', () => {
 
     f.draw();
 
+
     beams.forEach((beam) => beam.setContext(f.getContext()).draw());
+
+    await expectMatchingScreenshot(options, 'auto_beam_formatting_tests.test.ts');
 
     assert.ok(true, 'Auto Beam Applicator Test');
   });
 
-  runTest('More Simple Tuplet Auto Beaming', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('More Simple Tuplet Auto Beaming', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 450, 140);
+    const f = makeFactory(options.backend, options.elementId, 450, 140, options);
     const stave = f.Stave();
     const score = f.EasyScore();
 
@@ -543,14 +600,17 @@ describe('Auto-Beaming', () => {
 
     f.draw();
 
+
     beams.forEach((beam) => beam.setContext(f.getContext()).draw());
+
+    await expectMatchingScreenshot(options, 'auto_beam_formatting_tests.test.ts');
 
     assert.ok(true, 'Auto Beam Applicator Test');
   });
 
-  runTest('More Automatic Beaming', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('More Automatic Beaming', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 450, 140);
+    const f = makeFactory(options.backend, options.elementId, 450, 140, options);
     const stave = f.Stave();
     const score = f.EasyScore();
 
@@ -564,14 +624,17 @@ describe('Auto-Beaming', () => {
 
     f.draw();
 
+
     beams.forEach((beam) => beam.setContext(f.getContext()).draw());
+
+    await expectMatchingScreenshot(options, 'auto_beam_formatting_tests.test.ts');
 
     assert.ok(true, 'Auto Beam Applicator Test');
   });
 
-  runTest('Automatic Beaming 4/4 with  3, 3, 2 Pattern', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Automatic Beaming 4/4 with  3, 3, 2 Pattern', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 450, 140);
+    const f = makeFactory(options.backend, options.elementId, 450, 140, options);
     const stave = f.Stave();
     const score = f.EasyScore();
 
@@ -583,14 +646,17 @@ describe('Auto-Beaming', () => {
 
     f.draw();
 
+
     beams.forEach((beam) => beam.setContext(f.getContext()).draw());
+
+    await expectMatchingScreenshot(options, 'auto_beam_formatting_tests.test.ts');
 
     assert.ok(true, 'Auto Beam Applicator Test');
   });
 
-  runTest('Automatic Beaming 4/4 with  3, 3, 2 Pattern and Overflow', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Automatic Beaming 4/4 with  3, 3, 2 Pattern and Overflow', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 450, 140);
+    const f = makeFactory(options.backend, options.elementId, 450, 140, options);
     const stave = f.Stave();
     const score = f.EasyScore();
 
@@ -602,14 +668,17 @@ describe('Auto-Beaming', () => {
 
     f.draw();
 
+
     beams.forEach((beam) => beam.setContext(f.getContext()).draw());
+
+    await expectMatchingScreenshot(options, 'auto_beam_formatting_tests.test.ts');
 
     assert.ok(true, 'Auto Beam Applicator Test');
   });
 
-  runTest('Automatic Beaming 8/4 with  3, 2, 3 Pattern and 2 Overflows', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Automatic Beaming 8/4 with  3, 2, 3 Pattern and 2 Overflows', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 450, 140);
+    const f = makeFactory(options.backend, options.elementId, 450, 140, options);
     const stave = f.Stave();
     const score = f.EasyScore();
 
@@ -626,14 +695,17 @@ describe('Auto-Beaming', () => {
 
     f.draw();
 
+
     beams.forEach((beam) => beam.setContext(f.getContext()).draw());
+
+    await expectMatchingScreenshot(options, 'auto_beam_formatting_tests.test.ts');
 
     assert.ok(true, 'Auto Beam Applicator Test');
   });
 
-  runTest('Automatic Beaming 8/4 with  3, 2, 3 Pattern and 3 Overflows', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Automatic Beaming 8/4 with  3, 2, 3 Pattern and 3 Overflows', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 450, 140);
+    const f = makeFactory(options.backend, options.elementId, 450, 140, options);
     const stave = f.Stave();
     const score = f.EasyScore();
 
@@ -645,14 +717,17 @@ describe('Auto-Beaming', () => {
 
     f.draw();
 
+
     beams.forEach((beam) => beam.setContext(f.getContext()).draw());
+
+    await expectMatchingScreenshot(options, 'auto_beam_formatting_tests.test.ts');
 
     assert.ok(true, 'Auto Beam Applicator Test');
   });
 
-  runTest('Duration-Based Secondary Beam Breaks', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Duration-Based Secondary Beam Breaks', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 450, 140);
+    const f = makeFactory(options.backend, options.elementId, 450, 140, options);
     const stave = f.Stave();
     const score = f.EasyScore();
 
@@ -673,14 +748,17 @@ describe('Auto-Beaming', () => {
 
     f.draw();
 
+
     beams.forEach((beam) => beam.setContext(f.getContext()).draw());
+
+    await expectMatchingScreenshot(options, 'auto_beam_formatting_tests.test.ts');
 
     assert.ok(true, 'Duration-Based Secondary Breaks Test');
   });
 
-  runTest('Duration-Based Secondary Beam Breaks 2', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Duration-Based Secondary Beam Breaks 2', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 450, 140);
+    const f = makeFactory(options.backend, options.elementId, 450, 140, options);
     const stave = f.Stave();
     const score = f.EasyScore();
 
@@ -704,14 +782,17 @@ describe('Auto-Beaming', () => {
 
     f.draw();
 
+
     beams.forEach((beam) => beam.setContext(f.getContext()).draw());
+
+    await expectMatchingScreenshot(options, 'auto_beam_formatting_tests.test.ts');
 
     assert.ok(true, 'Duration-Based Secondary Breaks Test');
   });
 
-  runTest('Flat Beams Up', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Flat Beams Up', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 450, 140);
+    const f = makeFactory(options.backend, options.elementId, 450, 140, options);
     const stave = f.Stave({ y: 40 });
     const score = f.EasyScore();
 
@@ -735,14 +816,17 @@ describe('Auto-Beaming', () => {
 
     f.draw();
 
+
     beams.forEach((beam) => beam.setContext(f.getContext()).draw());
+
+    await expectMatchingScreenshot(options, 'auto_beam_formatting_tests.test.ts');
 
     assert.ok(true, 'Flat Beams Up Test');
   });
 
-  runTest('Flat Beams Down', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Flat Beams Down', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 450, 200);
+    const f = makeFactory(options.backend, options.elementId, 450, 200, options);
     const stave = f.Stave({ y: 40 });
     const score = f.EasyScore();
 
@@ -761,14 +845,17 @@ describe('Auto-Beaming', () => {
 
     f.draw();
 
+
     beams.forEach((beam) => beam.setContext(f.getContext()).draw());
+
+    await expectMatchingScreenshot(options, 'auto_beam_formatting_tests.test.ts');
 
     assert.ok(true, 'Flat Beams Down Test');
   });
 
-  runTest('Flat Beams Mixed Direction', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Flat Beams Mixed Direction', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 450, 200);
+    const f = makeFactory(options.backend, options.elementId, 450, 200, options);
     const stave = f.Stave({ y: 40 });
     const score = f.EasyScore();
 
@@ -784,14 +871,17 @@ describe('Auto-Beaming', () => {
 
     f.draw();
 
+
     beams.forEach((beam) => beam.setContext(f.getContext()).draw());
+
+    await expectMatchingScreenshot(options, 'auto_beam_formatting_tests.test.ts');
 
     assert.ok(true, 'Flat Beams Mixed Direction Test');
   });
 
-  runTest('Flat Beams Up (uniform)', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Flat Beams Up (uniform)', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 450, 140);
+    const f = makeFactory(options.backend, options.elementId, 450, 140, options);
     const stave = f.Stave({ y: 40 });
     const score = f.EasyScore();
 
@@ -812,14 +902,17 @@ describe('Auto-Beaming', () => {
 
     f.draw();
 
+
     beams.forEach((beam) => beam.setContext(f.getContext()).draw());
+
+    await expectMatchingScreenshot(options, 'auto_beam_formatting_tests.test.ts');
 
     assert.ok(true, 'Flat Beams Up (uniform) Test');
   });
 
-  runTest('Flat Beams Down (uniform)', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Flat Beams Down (uniform)', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 450, 200);
+    const f = makeFactory(options.backend, options.elementId, 450, 200, options);
     const stave = f.Stave({ y: 40 });
     const score = f.EasyScore();
 
@@ -839,14 +932,17 @@ describe('Auto-Beaming', () => {
 
     f.draw();
 
+
     beams.forEach((beam) => beam.setContext(f.getContext()).draw());
+
+    await expectMatchingScreenshot(options, 'auto_beam_formatting_tests.test.ts');
 
     assert.ok(true, 'Flat Beams Down (uniform) Test');
   });
 
-  runTest('Flat Beams Up Bounds', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Flat Beams Up Bounds', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 450, 140);
+    const f = makeFactory(options.backend, options.elementId, 450, 140, options);
     const stave = f.Stave({ y: 40 });
     const score = f.EasyScore();
 
@@ -867,14 +963,17 @@ describe('Auto-Beaming', () => {
 
     f.draw();
 
+
     beams.forEach((beam) => beam.setContext(f.getContext()).draw());
+
+    await expectMatchingScreenshot(options, 'auto_beam_formatting_tests.test.ts');
 
     assert.ok(true, 'Flat Beams Up (uniform) Test');
   });
 
-  runTest('Flat Beams Down Bounds', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Flat Beams Down Bounds', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 450, 200);
+    const f = makeFactory(options.backend, options.elementId, 450, 200, options);
     const stave = f.Stave({ y: 40 });
     const score = f.EasyScore();
 
@@ -900,7 +999,10 @@ describe('Auto-Beaming', () => {
 
     f.draw();
 
+
     beams.forEach((beam) => beam.setContext(f.getContext()).draw());
+
+    await expectMatchingScreenshot(options, 'auto_beam_formatting_tests.test.ts');
 
     assert.ok(true, 'Flat Beams Down (uniform) Test');
   });

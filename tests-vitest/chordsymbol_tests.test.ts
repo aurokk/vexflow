@@ -12,11 +12,18 @@ import { Flow } from '../src/flow';
 import { Font, FontGlyph } from '../src/font';
 import { Formatter } from '../src/formatter';
 import { Ornament } from '../src/ornament';
-import { Renderer } from '../src/renderer';
+import { ContextBuilder, Renderer } from '../src/renderer';
 import { Stave } from '../src/stave';
 import { StaveNote } from '../src/stavenote';
 import { Tables } from '../src/tables';
-import { createAssert, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
+import {
+  createAssert,
+  expectMatchingScreenshot,
+  FONT_STACKS,
+  generateTestID,
+  makeFactory,
+  TestOptions,
+} from './vitest_test_helpers';
 
 // Options for customizing addGlyphOrText() or addGlyph().
 const superscript = { symbolModifier: ChordSymbol.symbolModifiers.SUPERSCRIPT };
@@ -36,9 +43,9 @@ function getGlyphWidth(glyphName: string): number {
 
 describe('ChordSymbol', () => {
   // Helper function to run a test with multiple backends and font stacks
-  function runTest(
+  async function runTest(
     testName: string,
-    testFunc: (options: TestOptions) => void,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void | Promise<void>,
     backends: Array<{ backend: number; fontStacks: string[] }> = [
       { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
       { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
@@ -46,7 +53,7 @@ describe('ChordSymbol', () => {
   ) {
     backends.forEach(({ backend, fontStacks }) => {
       fontStacks.forEach((fontStackName) => {
-        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, async () => {
           const elementId = generateTestID('chordsymbol_test');
 
           // Create the DOM element before the test runs
@@ -55,14 +62,22 @@ describe('ChordSymbol', () => {
           element.id = elementId;
           document.body.appendChild(element);
 
-          const options: TestOptions = { elementId, params: {}, backend };
+          const options: TestOptions = {
+            elementId,
+            params: {},
+            backend,
+            testName,
+            fontStackName,
+          };
 
           // Set font stack
           const originalFontNames = Flow.getMusicFont();
           Flow.setMusicFont(...FONT_STACKS[fontStackName]);
 
           try {
-            testFunc(options);
+            const contextBuilder: ContextBuilder =
+              backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
+            await testFunc(options, contextBuilder);
           } finally {
             // Restore original font
             Flow.setMusicFont(...originalFontNames);
@@ -74,8 +89,8 @@ describe('ChordSymbol', () => {
     });
   }
 
-  runTest('Chord Symbol With Modifiers', (options: TestOptions) => {
-    const f = makeFactory(options.backend, options.elementId, 750, 580);
+  runTest('Chord Symbol With Modifiers', async (options: TestOptions, contextBuilder: ContextBuilder) => {
+    const f = makeFactory(options.backend, options.elementId, 750, 580, options);
     const ctx = f.getContext();
     ctx.scale(1.5, 1.5);
 
@@ -163,11 +178,13 @@ describe('ChordSymbol', () => {
     ];
     draw(chords, 240);
 
+    await expectMatchingScreenshot(options, 'chordsymbol_tests.test.ts');
+
     createAssert().ok(true, 'Font Size Chord Symbol');
   });
 
-  runTest('Chord Symbol Font Size Tests', (options: TestOptions) => {
-    const f = makeFactory(options.backend, options.elementId, 750, 580);
+  runTest('Chord Symbol Font Size Tests', async (options: TestOptions, contextBuilder: ContextBuilder) => {
+    const f = makeFactory(options.backend, options.elementId, 750, 580, options);
     const ctx = f.getContext();
     ctx.scale(1.5, 1.5);
 
@@ -259,11 +276,13 @@ describe('ChordSymbol', () => {
     ];
     draw(chords, 240);
 
+    await expectMatchingScreenshot(options, 'chordsymbol_tests.test.ts');
+
     createAssert().ok(true, 'Font Size Chord Symbol');
   });
 
-  runTest('Chord Symbol Kerning Tests', (options: TestOptions) => {
-    const f = makeFactory(options.backend, options.elementId, 650 * 1.5, 650);
+  runTest('Chord Symbol Kerning Tests', async (options: TestOptions, contextBuilder: ContextBuilder) => {
+    const f = makeFactory(options.backend, options.elementId, 650 * 1.5, 650, options);
     const ctx = f.getContext();
     ctx.scale(1.5, 1.5);
 
@@ -314,11 +333,13 @@ describe('ChordSymbol', () => {
     ];
     draw(chords, 310);
 
+    await expectMatchingScreenshot(options, 'chordsymbol_tests.test.ts');
+
     createAssert().ok(true, 'Chord Symbol Kerning Tests');
   });
 
-  runTest('Top Chord Symbols', (options: TestOptions) => {
-    const f = makeFactory(options.backend, options.elementId, 650 * 1.5, 650);
+  runTest('Top Chord Symbols', async (options: TestOptions, contextBuilder: ContextBuilder) => {
+    const f = makeFactory(options.backend, options.elementId, 650 * 1.5, 650, options);
     const ctx = f.getContext();
     ctx.scale(1.5, 1.5);
 
@@ -369,11 +390,13 @@ describe('ChordSymbol', () => {
     chord2 = f.ChordSymbol().addText('C').addTextSuperscript('sus4');
     draw(chord1, chord2, 240);
 
+    await expectMatchingScreenshot(options, 'chordsymbol_tests.test.ts');
+
     createAssert().ok(true, 'Top Chord Symbol');
   });
 
-  runTest('Top Chord Symbols Justified', (options: TestOptions) => {
-    const f = makeFactory(options.backend, options.elementId, 500 * 1.5, 680);
+  runTest('Top Chord Symbols Justified', async (options: TestOptions, contextBuilder: ContextBuilder) => {
+    const f = makeFactory(options.backend, options.elementId, 500 * 1.5, 680, options);
     const ctx = f.getContext();
     ctx.scale(1.5, 1.5);
 
@@ -417,11 +440,13 @@ describe('ChordSymbol', () => {
     chord2 = f.ChordSymbol({ hJustify: 'centerStem' }).addText('C').addTextSuperscript('Maj.');
     draw(chord1, chord2, 340);
 
+    await expectMatchingScreenshot(options, 'chordsymbol_tests.test.ts');
+
     createAssert().ok(true, 'Top Chord Justified');
   });
 
-  runTest('Bottom Chord Symbols', (options: TestOptions) => {
-    const f = makeFactory(options.backend, options.elementId, 600 * 1.5, 230);
+  runTest('Bottom Chord Symbols', async (options: TestOptions, contextBuilder: ContextBuilder) => {
+    const f = makeFactory(options.backend, options.elementId, 600 * 1.5, 230, options);
     const ctx = f.getContext();
     ctx.scale(1.5, 1.5);
 
@@ -445,11 +470,14 @@ describe('ChordSymbol', () => {
     ];
 
     draw(chords, 10);
+
+    await expectMatchingScreenshot(options, 'chordsymbol_tests.test.ts');
+
     createAssert().ok(true, 'Bottom Chord Symbol');
   });
 
-  runTest('Bottom Stem Down Chord Symbols', (options: TestOptions) => {
-    const f = makeFactory(options.backend, options.elementId, 600 * 1.5, 330);
+  runTest('Bottom Stem Down Chord Symbols', async (options: TestOptions, contextBuilder: ContextBuilder) => {
+    const f = makeFactory(options.backend, options.elementId, 600 * 1.5, 330, options);
     const ctx = f.getContext();
     ctx.scale(1.5, 1.5);
 
@@ -476,11 +504,14 @@ describe('ChordSymbol', () => {
     ];
 
     draw(chords, 10);
+
+    await expectMatchingScreenshot(options, 'chordsymbol_tests.test.ts');
+
     createAssert().ok(true, 'Bottom Stem Down Chord Symbol');
   });
 
-  runTest('Double Bottom Chord Symbols', (options: TestOptions) => {
-    const f = makeFactory(options.backend, options.elementId, 600 * 1.5, 260);
+  runTest('Double Bottom Chord Symbols', async (options: TestOptions, contextBuilder: ContextBuilder) => {
+    const f = makeFactory(options.backend, options.elementId, 600 * 1.5, 260, options);
     const ctx = f.getContext();
     ctx.scale(1.5, 1.5);
 
@@ -513,6 +544,9 @@ describe('ChordSymbol', () => {
     ];
 
     draw(chords1, chords2, 10);
+
+    await expectMatchingScreenshot(options, 'chordsymbol_tests.test.ts');
+
     createAssert().ok(true, '2 Bottom Chord Symbol');
   });
 });

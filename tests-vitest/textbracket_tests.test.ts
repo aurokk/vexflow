@@ -7,13 +7,13 @@ import { describe, test } from 'vitest';
 
 import { Flow } from '../src/flow';
 import { ContextBuilder, Renderer } from '../src/renderer';
-import { createAssert, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
+import { createAssert, expectMatchingScreenshot, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
 
 describe('TextBracket', () => {
   // Helper function to run a test with multiple backends and font stacks
-  function runTest(
+  async function runTest(
     testName: string,
-    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void | Promise<void>,
     backends: Array<{ backend: number; fontStacks: string[] }> = [
       { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
       { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
@@ -21,7 +21,7 @@ describe('TextBracket', () => {
   ) {
     backends.forEach(({ backend, fontStacks }) => {
       fontStacks.forEach((fontStackName) => {
-        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, async () => {
           const elementId = generateTestID('textbracket_test');
 
           // Create the DOM element before the test runs
@@ -31,7 +31,7 @@ describe('TextBracket', () => {
           document.body.appendChild(element);
 
           const assert = createAssert();
-          const options: TestOptions = { elementId, params: {}, backend };
+          const options: TestOptions = { elementId, params: {}, backend, testName, fontStackName };
 
           // Set font stack
           const originalFontNames = Flow.getMusicFont();
@@ -40,7 +40,7 @@ describe('TextBracket', () => {
           try {
             const contextBuilder: ContextBuilder =
               backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
-            testFunc(options, contextBuilder);
+            await testFunc(options, contextBuilder);
           } finally {
             // Restore original font
             Flow.setMusicFont(...originalFontNames);
@@ -52,9 +52,9 @@ describe('TextBracket', () => {
     });
   }
 
-  runTest('Simple TextBracket', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Simple TextBracket', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 550);
+    const f = makeFactory(options.backend, options.elementId, 550, undefined, options);
     const stave = f.Stave();
     const score = f.EasyScore();
 
@@ -86,12 +86,13 @@ describe('TextBracket', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'textbracket_tests.test.ts');
     assert.ok(true);
   });
 
-  runTest('TextBracket Styles', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('TextBracket Styles', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 550);
+    const f = makeFactory(options.backend, options.elementId, 550, undefined, options);
     const stave = f.Stave();
     const score = f.EasyScore();
 
@@ -158,6 +159,7 @@ describe('TextBracket', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'textbracket_tests.test.ts');
     assert.ok(true);
   });
 });

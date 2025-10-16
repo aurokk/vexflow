@@ -9,12 +9,12 @@ import { Factory } from '../src/factory';
 import { Flow } from '../src/flow';
 import { Renderer, ContextBuilder } from '../src/renderer';
 import { Barline, BarlineType } from '../src/stavebarline';
-import { createAssert, FONT_STACKS, generateTestID, TestOptions } from './vitest_test_helpers';
+import { createAssert, expectMatchingScreenshot, FONT_STACKS, generateTestID, TestOptions } from './vitest_test_helpers';
 
 describe('Barline', () => {
-  function runTest(
+  async function runTest(
     testName: string,
-    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void | Promise<void>,
     backends: Array<{ backend: number; fontStacks: string[] }> = [
       { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
       { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
@@ -22,21 +22,21 @@ describe('Barline', () => {
   ) {
     backends.forEach(({ backend, fontStacks }) => {
       fontStacks.forEach((fontStackName) => {
-        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, async () => {
           const elementId = generateTestID('barline_test');
           const tagName = backend === Renderer.Backends.SVG ? 'div' : 'canvas';
           const element = document.createElement(tagName);
           element.id = elementId;
           document.body.appendChild(element);
 
-          const options: TestOptions = { elementId, params: {}, backend };
+          const options: TestOptions = { elementId, params: {}, backend, testName, fontStackName };
           const originalFontNames = Flow.getMusicFont();
           Flow.setMusicFont(...FONT_STACKS[fontStackName]);
 
           try {
             const contextBuilder: ContextBuilder =
               backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
-            testFunc(options, contextBuilder);
+            await testFunc(options, contextBuilder);
           } finally {
             Flow.setMusicFont(...originalFontNames);
           }
@@ -57,10 +57,10 @@ describe('Barline', () => {
     assert.equal(a, b);
   });
 
-  runTest('Simple BarNotes', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Simple BarNotes', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    
-    
+
+
 
     const f = new Factory({ renderer: { elementId: options.elementId, backend: options.backend, width: 380, height: 160 } });
     const stave = f.Stave();
@@ -78,6 +78,8 @@ describe('Barline', () => {
     f.Formatter().joinVoices([voice]).formatToStave([voice], stave);
     f.draw();
 
+    await expectMatchingScreenshot(options, 'barline_tests.test.ts');
+
     if (options.backend === Renderer.Backends.SVG) {
       notes.forEach((note) => {
         assert.notEqual(note.getSVGElement(), undefined);
@@ -87,10 +89,10 @@ describe('Barline', () => {
     assert.ok(true, 'Simple Test');
   });
 
-  runTest('Style BarNotes', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Style BarNotes', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    
-    
+
+
 
     const f = new Factory({ renderer: { elementId: options.elementId, backend: options.backend, width: 380, height: 160 } });
     const stave = f.Stave();
@@ -108,6 +110,8 @@ describe('Barline', () => {
     const voice = f.Voice().addTickables(notes);
     f.Formatter().joinVoices([voice]).formatToStave([voice], stave);
     f.draw();
+
+    await expectMatchingScreenshot(options, 'barline_tests.test.ts');
 
     assert.ok(true, 'Style');
   });

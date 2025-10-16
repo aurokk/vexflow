@@ -15,7 +15,7 @@ import { Renderer } from '../src/renderer';
 import { TabNote, TabNoteStruct } from '../src/tabnote';
 import { TabStave } from '../src/tabstave';
 import { TickContext } from '../src/tickcontext';
-import { ContextBuilder, createAssert, FONT_STACKS, generateTestID, TestOptions } from './vitest_test_helpers';
+import { ContextBuilder, createAssert, expectMatchingScreenshot, FONT_STACKS, generateTestID, TestOptions } from './vitest_test_helpers';
 
 // Helper functions for creating TabNote and Bend objects.
 const note = (noteStruct: TabNoteStruct) => new TabNote(noteStruct);
@@ -23,9 +23,9 @@ const bendWithText = (text: string, release = false) => new Bend(text, release);
 const bendWithPhrase = (phrase: BendPhrase[]) => new Bend('', false, phrase);
 
 describe('Bend', () => {
-  function runTest(
+  async function runTest(
     testName: string,
-    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void | Promise<void>,
     backends: Array<{ backend: number; fontStacks: string[] }> = [
       { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
       { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
@@ -33,21 +33,21 @@ describe('Bend', () => {
   ) {
     backends.forEach(({ backend, fontStacks }) => {
       fontStacks.forEach((fontStackName) => {
-        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, async () => {
           const elementId = generateTestID('test');
           const tagName = backend === Renderer.Backends.SVG ? 'div' : 'canvas';
           const element = document.createElement(tagName);
           element.id = elementId;
           document.body.appendChild(element);
 
-          const options: TestOptions = { elementId, params: {}, backend };
+          const options: TestOptions = { elementId, params: {}, backend, testName, fontStackName };
           const originalFontNames = Flow.getMusicFont();
           Flow.setMusicFont(...FONT_STACKS[fontStackName]);
 
           try {
             const contextBuilder: ContextBuilder =
               backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
-            testFunc(options, contextBuilder);
+            await testFunc(options, contextBuilder);
           } finally {
             Flow.setMusicFont(...originalFontNames);
           }
@@ -55,9 +55,9 @@ describe('Bend', () => {
       });
     });
   }
-  runTest('Double Bends', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Double Bends', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    
+
     const renderer = new Renderer(options.elementId, options.backend);
     renderer.resize(500, 240);
     const ctx = renderer.getContext();
@@ -97,12 +97,14 @@ describe('Bend', () => {
     Formatter.FormatAndDraw(ctx, stave, notes);
     notes.forEach((note) => Note.plotMetrics(ctx, note, 140));
 
+    await expectMatchingScreenshot(options, 'bend_tests.test.ts');
+
     assert.ok(true, 'Double Bends');
   });
 
-  runTest('Reverse Bends', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Reverse Bends', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    
+
     const renderer = new Renderer(options.elementId, options.backend);
     renderer.resize(500, 240);
     const ctx = renderer.getContext();
@@ -155,11 +157,13 @@ describe('Bend', () => {
       Note.plotMetrics(ctx, note, 140);
       assert.ok(true, 'Bend ' + i);
     }
+
+    await expectMatchingScreenshot(options, 'bend_tests.test.ts');
   });
 
-  runTest('Bend Phrase', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Bend Phrase', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    
+
     const renderer = new Renderer(options.elementId, options.backend);
     renderer.resize(500, 240);
     const ctx = renderer.getContext();
@@ -197,11 +201,13 @@ describe('Bend', () => {
       Note.plotMetrics(ctx, note, 140);
       assert.ok(true, 'Bend ' + i);
     }
+
+    await expectMatchingScreenshot(options, 'bend_tests.test.ts');
   });
 
-  runTest('Double Bends With Release', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Double Bends With Release', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    
+
     const renderer = new Renderer(options.elementId, options.backend);
     renderer.resize(550, 240);
     const ctx = renderer.getContext();
@@ -245,12 +251,15 @@ describe('Bend', () => {
 
     Formatter.FormatAndDraw(ctx, stave, notes);
     notes.forEach((note) => Note.plotMetrics(ctx, note, 140));
+
+    await expectMatchingScreenshot(options, 'bend_tests.test.ts');
+
     assert.ok(true, 'Bend Release');
   });
 
-  runTest('Whako Bend', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Whako Bend', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    
+
     const renderer = new Renderer(options.elementId, options.backend);
     renderer.resize(400, 240);
     const ctx = renderer.getContext();
@@ -291,6 +300,9 @@ describe('Bend', () => {
 
     Formatter.FormatAndDraw(ctx, stave, notes);
     Note.plotMetrics(ctx, notes[0], 140);
+
+    await expectMatchingScreenshot(options, 'bend_tests.test.ts');
+
     assert.ok(true, 'Whacko Bend & Release');
   });
 });

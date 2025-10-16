@@ -10,13 +10,13 @@ import { ChordStave } from '../src/chordstave';
 import { Flow } from '../src/flow';
 import { ContextBuilder, Renderer } from '../src/renderer';
 import { Barline, BarlineType } from '../src/stavebarline';
-import { createAssert, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
+import { createAssert, expectMatchingScreenshot, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
 
 describe('ChordStave', () => {
   // Helper function to run a test with multiple backends and font stacks
-  function runTest(
+  async function runTest(
     testName: string,
-    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void | Promise<void>,
     backends: Array<{ backend: number; fontStacks: string[] }> = [
       { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
       { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
@@ -24,7 +24,7 @@ describe('ChordStave', () => {
   ) {
     backends.forEach(({ backend, fontStacks }) => {
       fontStacks.forEach((fontStackName) => {
-        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, async () => {
           const elementId = generateTestID('chordstave_test');
 
           // Create the DOM element before the test runs
@@ -33,7 +33,7 @@ describe('ChordStave', () => {
           element.id = elementId;
           document.body.appendChild(element);
 
-          const options: TestOptions = { elementId, params: {}, backend };
+          const options: TestOptions = { elementId, params: {}, backend, testName, fontStackName };
 
           // Set font stack
           const originalFontNames = Flow.getMusicFont();
@@ -42,7 +42,7 @@ describe('ChordStave', () => {
           try {
             const contextBuilder: ContextBuilder =
               backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
-            testFunc(options, contextBuilder);
+            await testFunc(options, contextBuilder);
           } finally {
             // Restore original font
             Flow.setMusicFont(...originalFontNames);
@@ -54,12 +54,14 @@ describe('ChordStave', () => {
     });
   }
 
-  runTest('ChordStave Draw Test', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('ChordStave Draw Test', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const ctx = contextBuilder(options.elementId, 400, 160);
 
     const stave = new ChordStave(10, 10, 300);
     stave.setContext(ctx);
     stave.draw();
+
+    await expectMatchingScreenshot(options, 'chordstave_tests.test.ts');
 
     // ChordStave doesn't have getYForNote - it only has getYForLine
     const assert = createAssert();
@@ -69,7 +71,7 @@ describe('ChordStave', () => {
     assert.ok(true, 'all pass');
   });
 
-  runTest('ChordStave with Time Signature', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('ChordStave with Time Signature', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const ctx = contextBuilder(options.elementId, 500, 160);
 
     const stave = new ChordStave(10, 10, 400);
@@ -80,6 +82,8 @@ describe('ChordStave', () => {
 
     stave.draw();
 
+    await expectMatchingScreenshot(options, 'chordstave_tests.test.ts');
+
     // Verify modifier was added
     const modifiers = stave.getModifiers();
     const assert = createAssert();
@@ -87,13 +91,13 @@ describe('ChordStave', () => {
     assert.ok(true, 'Time signature renders successfully');
   });
 
-  runTest('Multiple ChordStaves (4x4 Grid)', (options: TestOptions) => {
+  runTest('Multiple ChordStaves (4x4 Grid)', async (options: TestOptions) => {
     // Create a large canvas for 4 lines of 4 staves each
     const staveWidth = 200;
     const timeSignatureWidth = 40;
     const padding = 10;
     const canvasWidth = padding + timeSignatureWidth + staveWidth * 4 + timeSignatureWidth + padding;
-    const f = makeFactory(options.backend, options.elementId, canvasWidth, 400);
+    const f = makeFactory(options.backend, options.elementId, canvasWidth, 400, options);
 
     const startX = padding + timeSignatureWidth;
     const startY = 10;
@@ -179,6 +183,8 @@ describe('ChordStave', () => {
         chordIndex++;
       }
     }
+
+    await expectMatchingScreenshot(options, 'chordstave_tests.test.ts');
 
     const assert = createAssert();
     assert.equal(chordIndex, 16, 'Should render 16 chords');

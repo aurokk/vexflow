@@ -21,7 +21,7 @@ import {
 
 import { describe, test } from 'vitest';
 
-import { ContextBuilder, createAssert, FONT_STACKS, generateTestID, TestOptions } from './vitest_test_helpers';
+import { ContextBuilder, createAssert, expectMatchingScreenshot, FONT_STACKS, generateTestID, TestOptions } from './vitest_test_helpers';
 
 
 const STAVE_WIDTH = 700;
@@ -60,9 +60,9 @@ function useFactoryAPI(e: HTMLCanvasElement | HTMLDivElement | string, backend: 
 
 describe('Renderer', () => {
   // Helper function to run a test with multiple backends and font stacks
-  function runTest(
+  async function runTest(
     testName: string,
-    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void | Promise<void>,
     backends: Array<{ backend: number; fontStacks: string[] }> = [
       { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
       { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
@@ -70,7 +70,7 @@ describe('Renderer', () => {
   ) {
     backends.forEach(({ backend, fontStacks }) => {
       fontStacks.forEach((fontStackName) => {
-        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, async () => {
           const elementId = generateTestID('renderer_test');
 
           // Create the DOM element before the test runs
@@ -80,7 +80,7 @@ describe('Renderer', () => {
           document.body.appendChild(element);
 
           const assert = createAssert();
-          const options: TestOptions = { elementId, params: {}, backend };
+          const options: TestOptions = { elementId, params: {}, backend, testName, fontStackName };
 
           // Set font stack
           const originalFontNames = Flow.getMusicFont();
@@ -89,7 +89,7 @@ describe('Renderer', () => {
           try {
             const contextBuilder: ContextBuilder =
               backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
-            testFunc(options, contextBuilder);
+            await testFunc(options, contextBuilder);
           } finally {
             // Restore original font
             Flow.setMusicFont(...originalFontNames);
@@ -101,7 +101,7 @@ describe('Renderer', () => {
     });
   }
 
-  runTest('Random', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Random', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const useElementIDString = Math.random() > 0.5;
     const shouldUseRendererAPI = Math.random() > 0.5;
@@ -121,23 +121,26 @@ describe('Renderer', () => {
       }
     }
 
+    await expectMatchingScreenshot(options, 'renderer_tests.test.ts');
     assert.ok(true);
   });
 
-  runTest('Renderer API with element ID string', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Renderer API with element ID string', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     useRendererAPI(options.elementId, options.backend);
+    await expectMatchingScreenshot(options, 'renderer_tests.test.ts');
     assert.ok(true);
   });
 
-  runTest('Renderer API with canvas or div', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Renderer API with canvas or div', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const element = document.getElementById(options.elementId) as HTMLCanvasElement | HTMLDivElement;
     useRendererAPI(element, options.backend);
+    await expectMatchingScreenshot(options, 'renderer_tests.test.ts');
     assert.ok(true);
   });
 
-  runTest('Renderer API with context', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Renderer API with context', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     let context: RenderContext;
     const element = document.getElementById(options.elementId) as HTMLCanvasElement | HTMLDivElement;
@@ -154,19 +157,22 @@ describe('Renderer', () => {
     const renderer = new Renderer(context);
     renderer.resize(STAVE_WIDTH, STAVE_HEIGHT);
     drawStave(new Stave(0, 0, STAVE_WIDTH - STAVE_RIGHT_MARGIN).setContext(context), context);
+    await expectMatchingScreenshot(options, 'renderer_tests.test.ts');
     assert.ok(true);
   });
 
-  runTest('Factory API with element ID string', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Factory API with element ID string', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     useFactoryAPI(options.elementId, options.backend);
+    await expectMatchingScreenshot(options, 'renderer_tests.test.ts');
     assert.ok(true);
   });
 
-  runTest('Factory API with canvas or div', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Factory API with canvas or div', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const element = document.getElementById(options.elementId) as HTMLCanvasElement | HTMLDivElement;
     useFactoryAPI(element, options.backend);
+    await expectMatchingScreenshot(options, 'renderer_tests.test.ts');
     assert.ok(true);
   });
 });

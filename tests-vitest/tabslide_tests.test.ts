@@ -14,16 +14,16 @@ import { TabNote, TabNoteStruct } from '../src/tabnote';
 import { TabSlide } from '../src/tabslide';
 import { TabStave } from '../src/tabstave';
 import { Voice } from '../src/voice';
-import { createAssert, FONT_STACKS, generateTestID, TestOptions } from './vitest_test_helpers';
+import { createAssert, expectMatchingScreenshot, FONT_STACKS, generateTestID, TestOptions } from './vitest_test_helpers';
 
 // Helper function to create TabNote objects.
 const tabNote = (noteStruct: TabNoteStruct) => new TabNote(noteStruct);
 
 describe('TabSlide', () => {
   // Helper function to run a test with multiple backends and font stacks
-  function runTest(
+  async function runTest(
     testName: string,
-    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void | Promise<void>,
     backends: Array<{ backend: number; fontStacks: string[] }> = [
       { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
       { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
@@ -31,7 +31,7 @@ describe('TabSlide', () => {
   ) {
     backends.forEach(({ backend, fontStacks }) => {
       fontStacks.forEach((fontStackName) => {
-        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, async () => {
           const elementId = generateTestID('tabslide_test');
 
           // Create the DOM element before the test runs
@@ -41,7 +41,7 @@ describe('TabSlide', () => {
           document.body.appendChild(element);
 
           const assert = createAssert();
-          const options: TestOptions = { elementId, params: {}, backend };
+          const options: TestOptions = { elementId, params: {}, backend, testName, fontStackName };
 
           // Set font stack
           const originalFontNames = Flow.getMusicFont();
@@ -50,7 +50,7 @@ describe('TabSlide', () => {
           try {
             const contextBuilder: ContextBuilder =
               backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
-            testFunc(options, contextBuilder);
+            await testFunc(options, contextBuilder);
           } finally {
             // Restore original font
             Flow.setMusicFont(...originalFontNames);
@@ -83,7 +83,7 @@ describe('TabSlide', () => {
     tie.draw();
   }
 
-  runTest('Simple TabSlide', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Simple TabSlide', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const context = contextBuilder(options.elementId, 350, 140);
     context.scale(0.9, 0.9);
@@ -99,6 +99,7 @@ describe('TabSlide', () => {
       stave,
       context
     );
+    await expectMatchingScreenshot(options, 'tabslide_tests.test.ts');
     assert.ok(true, 'Simple Test');
   });
 
@@ -106,7 +107,7 @@ describe('TabSlide', () => {
    * The slideUp and slideDown tests use a builder function: TabSlide.createSlideUp | TabSlide.createSlideDown.
    */
   function multiTest(testName: string, buildTabSlide: (notes: TieNotes) => TabSlide) {
-    runTest(testName, (options: TestOptions, contextBuilder: ContextBuilder) => {
+    runTest(testName, async (options: TestOptions, contextBuilder: ContextBuilder) => {
       const assert = createAssert();
       const context = contextBuilder(options.elementId, 440, 140);
       context.scale(0.9, 0.9);
@@ -194,6 +195,7 @@ describe('TabSlide', () => {
         .setContext(context)
         .draw();
 
+      await expectMatchingScreenshot(options, 'tabslide_tests.test.ts');
       assert.ok(true, 'Chord high-fret');
     });
   }

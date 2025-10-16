@@ -12,13 +12,20 @@ import { Note } from '../src/note';
 import { ContextBuilder, Renderer } from '../src/renderer';
 import { Stave } from '../src/stave';
 import { TextNote } from '../src/textnote';
-import { createAssert, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
+import {
+  createAssert,
+  expectMatchingScreenshot,
+  FONT_STACKS,
+  generateTestID,
+  makeFactory,
+  TestOptions,
+} from './vitest_test_helpers';
 
 describe('TextNote', () => {
   // Helper function to run a test with multiple backends and font stacks
-  function runTest(
+  async function runTest(
     testName: string,
-    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void | Promise<void>,
     backends: Array<{ backend: number; fontStacks: string[] }> = [
       { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
       { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
@@ -26,7 +33,7 @@ describe('TextNote', () => {
   ) {
     backends.forEach(({ backend, fontStacks }) => {
       fontStacks.forEach((fontStackName) => {
-        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, async () => {
           const elementId = generateTestID('textnote_test');
 
           // Create the DOM element before the test runs
@@ -35,7 +42,7 @@ describe('TextNote', () => {
           element.id = elementId;
           document.body.appendChild(element);
 
-          const options: TestOptions = { elementId, params: {}, backend };
+          const options: TestOptions = { elementId, params: {}, backend, testName, fontStackName };
 
           // Set font stack
           const originalFontNames = Flow.getMusicFont();
@@ -44,7 +51,7 @@ describe('TextNote', () => {
           try {
             const contextBuilder: ContextBuilder =
               backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
-            testFunc(options, contextBuilder);
+            await testFunc(options, contextBuilder);
           } finally {
             // Restore original font
             Flow.setMusicFont(...originalFontNames);
@@ -56,9 +63,9 @@ describe('TextNote', () => {
     });
   }
 
-  runTest('TextNote Formatting', (options: TestOptions) => {
+  runTest('TextNote Formatting', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 400, 200);
+    const f = makeFactory(options.backend, options.elementId, 400, 200, options);
     const stave = f.Stave({ y: 40 });
     const score = f.EasyScore();
 
@@ -84,12 +91,13 @@ describe('TextNote', () => {
     formatter.joinVoices([voice1, voice2]).formatToStave([voice1, voice2], stave);
 
     f.draw();
+    await expectMatchingScreenshot(options, 'textnote_tests.test.ts');
     assert.ok(true);
   });
 
-  runTest('TextNote Formatting 2', (options: TestOptions) => {
+  runTest('TextNote Formatting 2', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 600, 200);
+    const f = makeFactory(options.backend, options.elementId, 600, 200, options);
     const stave = f.Stave({ y: 40 });
     const score = f.EasyScore();
 
@@ -139,12 +147,13 @@ describe('TextNote', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'textnote_tests.test.ts');
     assert.ok(true);
   });
 
-  runTest('TextNote Superscript and Subscript', (options: TestOptions) => {
+  runTest('TextNote Superscript and Subscript', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 600, 230);
+    const f = makeFactory(options.backend, options.elementId, 600, 230, options);
     const stave = f.Stave({ y: 40 });
     const score = f.EasyScore();
 
@@ -182,12 +191,13 @@ describe('TextNote', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'textnote_tests.test.ts');
     assert.ok(true);
   });
 
-  runTest('TextNote Formatting With Glyphs 0', (options: TestOptions) => {
+  runTest('TextNote Formatting With Glyphs 0', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 600, 230);
+    const f = makeFactory(options.backend, options.elementId, 600, 230, options);
     const stave = f.Stave({ y: 40 });
     const score = f.EasyScore();
 
@@ -221,12 +231,13 @@ describe('TextNote', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'textnote_tests.test.ts');
     assert.ok(true);
   });
 
-  runTest('TextNote Formatting With Glyphs 1', (options: TestOptions) => {
+  runTest('TextNote Formatting With Glyphs 1', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 600, 230);
+    const f = makeFactory(options.backend, options.elementId, 600, 230, options);
     const stave = f.Stave({ y: 40 });
     const score = f.EasyScore();
 
@@ -259,12 +270,13 @@ describe('TextNote', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'textnote_tests.test.ts');
     assert.ok(true);
   });
 
-  runTest('Crescendo', (options: TestOptions) => {
+  runTest('Crescendo', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 600, 230);
+    const f = makeFactory(options.backend, options.elementId, 600, 230, options);
     const stave = f.Stave({ y: 40 });
     const score = f.EasyScore();
 
@@ -280,12 +292,13 @@ describe('TextNote', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'textnote_tests.test.ts');
     assert.ok(true);
   });
 
-  runTest('Text Dynamics', (options: TestOptions) => {
+  runTest('Text Dynamics', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 600, 230);
+    const f = makeFactory(options.backend, options.elementId, 600, 230, options);
     const score = f.EasyScore();
 
     const voice = score.voice(
@@ -312,6 +325,7 @@ describe('TextNote', () => {
     const stave = f.Stave({ y: 40, width: width + Stave.defaultPadding });
     stave.draw();
     voice.draw(f.getContext(), stave);
+    await expectMatchingScreenshot(options, 'textnote_tests.test.ts');
     assert.ok(true);
   });
 });

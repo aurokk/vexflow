@@ -11,7 +11,7 @@ import { Factory } from '../src/factory';
 import { Flow } from '../src/flow';
 import { ContextBuilder, Renderer } from '../src/renderer';
 import { StemmableNote } from '../src/stemmablenote';
-import { createAssert, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
+import { createAssert, expectMatchingScreenshot, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
 
 // Concat helper for flattening arrays
 const concat = (a: any, b: any) => a.concat(b);
@@ -29,9 +29,9 @@ function createTest(
   noteGroup2: NoteParams,
   setupCurves: (f: Factory, n: StemmableNote[]) => void
 ) {
-  return (options: TestOptions, contextBuilder: ContextBuilder) => {
+  return async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const factory = makeFactory(options.backend, options.elementId, 350, 200);
+    const factory = makeFactory(options.backend, options.elementId, 350, 200, options);
     const stave = factory.Stave({ y: 50 });
     const score = factory.EasyScore();
 
@@ -46,6 +46,8 @@ function createTest(
     const voices = [score.voice(staveNotes, { time: '4/4' })];
     factory.Formatter().joinVoices(voices).formatToStave(voices, stave);
     factory.draw();
+
+    await expectMatchingScreenshot(options, 'curve_tests.test.ts');
 
     assert.ok('Simple Curve');
   };
@@ -164,9 +166,9 @@ const top = createTest(
 
 describe('Curve', () => {
   // Helper function to run a test with multiple backends and font stacks
-  function runTest(
+  async function runTest(
     testName: string,
-    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void | Promise<void>,
     backends: Array<{ backend: number; fontStacks: string[] }> = [
       { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
       { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
@@ -174,7 +176,7 @@ describe('Curve', () => {
   ) {
     backends.forEach(({ backend, fontStacks }) => {
       fontStacks.forEach((fontStackName) => {
-        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, async () => {
           const elementId = generateTestID('curve_test');
 
           // Create the DOM element before the test runs
@@ -183,7 +185,7 @@ describe('Curve', () => {
           element.id = elementId;
           document.body.appendChild(element);
 
-          const options: TestOptions = { elementId, params: {}, backend };
+          const options: TestOptions = { elementId, params: {}, backend, testName, fontStackName };
 
           // Set font stack
           const originalFontNames = Flow.getMusicFont();
@@ -192,7 +194,7 @@ describe('Curve', () => {
           try {
             const contextBuilder: ContextBuilder =
               backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
-            testFunc(options, contextBuilder);
+            await testFunc(options, contextBuilder);
           } finally {
             // Restore original font
             Flow.setMusicFont(...originalFontNames);

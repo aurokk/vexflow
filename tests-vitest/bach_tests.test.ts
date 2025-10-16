@@ -5,38 +5,62 @@
 
 import { BarlineType, Factory, Registry, StaveNote } from '../src/index';
 
-import { afterAll, beforeAll, describe, test } from 'vitest';
+import { describe, test } from 'vitest';
 
 import { Flow } from '../src/flow';
-import { createAssert, FONT_STACKS } from './vitest_test_helpers';
+import { ContextBuilder, Renderer } from '../src/renderer';
+import { createAssert, expectMatchingScreenshot, FONT_STACKS, generateTestID, TestOptions } from './vitest_test_helpers';
 
 // Helper to flatten arrays
 const concat = <T>(a: T[], b: T[]): T[] => a.concat(b);
 
-/**
- * Helper to create a unique element ID and DOM element for testing
- */
-function createTestElement() {
-  const elementId = 'test_' + Date.now() + '_' + Math.random();
-  const element = document.createElement('canvas');
-  element.id = elementId;
-  document.body.appendChild(element);
-  return elementId;
+// Helper function to run a test with multiple backends and font stacks
+async function runTest(
+  testName: string,
+  testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void | Promise<void>,
+  backends: Array<{ backend: number; fontStacks: string[] }> = [
+    { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
+    { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
+  ]
+) {
+  backends.forEach(({ backend, fontStacks }) => {
+    fontStacks.forEach((fontStackName) => {
+      test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, async () => {
+        const elementId = generateTestID('bach_test');
+
+        // Create the DOM element before the test runs
+        const tagName = backend === Renderer.Backends.SVG ? 'div' : 'canvas';
+        const element = document.createElement(tagName);
+        element.id = elementId;
+        document.body.appendChild(element);
+
+        const options: TestOptions = {
+          elementId,
+          params: {},
+          backend,
+          testName,
+          fontStackName,
+        };
+
+        // Set font stack
+        const originalFontNames = Flow.getMusicFont();
+        Flow.setMusicFont(...FONT_STACKS[fontStackName]);
+
+        try {
+          const contextBuilder: ContextBuilder =
+            backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
+          await testFunc(options, contextBuilder);
+        } finally {
+          // Restore original font
+          Flow.setMusicFont(...originalFontNames);
+        }
+      });
+    });
+  });
 }
 
 describe('Bach Demo', () => {
-  let originalFontNames: string[];
-
-  beforeAll(async () => {
-    originalFontNames = Flow.getMusicFont();
-    Flow.setMusicFont(...FONT_STACKS['Bravura']);
-  });
-
-  afterAll(() => {
-    Flow.setMusicFont(...originalFontNames);
-  });
-
-  test('Minuet 1 - Canvas - Bravura', () => {
+  runTest('Minuet 1', async (options: TestOptions) => {
     const assert = createAssert();
     const registry = new Registry();
     Registry.enableDefaultRegistry(registry);
@@ -44,8 +68,7 @@ describe('Bach Demo', () => {
     // Retrieve the element from the registry and cast to StaveNote, so we can call .addModifier( ) later.
     const id = (id: string) => registry.getElementById(id) as StaveNote;
 
-    const elementId = createTestElement();
-    const f: Factory = new Factory({ renderer: { elementId, backend: 1, width: 1100, height: 900 } });
+    const f: Factory = new Factory({ renderer: { elementId: options.elementId, backend: options.backend, width: 1100, height: 900 } });
     const score = f.EasyScore({ throwOnError: true });
 
     // Bind these three functions so the code looks cleaner.
@@ -455,6 +478,9 @@ describe('Bach Demo', () => {
 
     /* Done */
     f.draw();
+
+    await expectMatchingScreenshot(options, 'bach_tests.test.ts');
+
     Registry.disableDefaultRegistry();
     assert.ok(true, 'Bach Minuet 1');
   });

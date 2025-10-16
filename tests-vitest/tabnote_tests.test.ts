@@ -16,7 +16,7 @@ import { TabNote, TabNoteStruct } from '../src/tabnote';
 import { TabStave } from '../src/tabstave';
 import { TickContext } from '../src/tickcontext';
 import { Voice, VoiceMode } from '../src/voice';
-import { createAssert, FONT_STACKS, generateTestID, TestOptions } from './vitest_test_helpers';
+import { createAssert, expectMatchingScreenshot, FONT_STACKS, generateTestID, TestOptions } from './vitest_test_helpers';
 
 describe('TabNote', () => {
   let originalFontNames: string[];
@@ -31,9 +31,9 @@ describe('TabNote', () => {
   });
 
   // Helper function to run a test with multiple backends and font stacks
-  function runTest(
+  async function runTest(
     testName: string,
-    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void | Promise<void>,
     backends: Array<{ backend: number; fontStacks: string[] }> = [
       { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
       { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
@@ -41,7 +41,7 @@ describe('TabNote', () => {
   ) {
     backends.forEach(({ backend, fontStacks }) => {
       fontStacks.forEach((fontStackName) => {
-        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, async () => {
           const elementId = generateTestID('tabnote_test');
 
           // Create the DOM element before the test runs
@@ -51,7 +51,7 @@ describe('TabNote', () => {
           document.body.appendChild(element);
 
           const assert = createAssert();
-          const options: TestOptions = { elementId, params: {}, backend };
+          const options: TestOptions = { elementId, params: {}, backend, testName, fontStackName };
 
           // Set font stack
           const originalFontNames = Flow.getMusicFont();
@@ -60,7 +60,7 @@ describe('TabNote', () => {
           try {
             const contextBuilder: ContextBuilder =
               backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
-            testFunc(options, contextBuilder);
+            await testFunc(options, contextBuilder);
           } finally {
             // Restore original font
             Flow.setMusicFont(...originalFontNames);
@@ -136,7 +136,7 @@ describe('TabNote', () => {
     assert.equal(tickContext.getWidth(), 7);
   });
 
-  runTest('TabNote Draw', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('TabNote Draw', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const ctx = contextBuilder(options.elementId, 600, 140);
     ctx.font = '10pt Arial';
@@ -211,9 +211,11 @@ describe('TabNote', () => {
       assert.ok(tabNote.getX() > 0, 'Note ' + i + ' has X value');
       assert.ok(tabNote.getYs().length > 0, 'Note ' + i + ' has Y values');
     }
+
+    await expectMatchingScreenshot(options, 'tabnote_tests.test.ts');
   });
 
-  runTest('TabNote Stems Up', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('TabNote Stems Up', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const ctx = contextBuilder(options.elementId, 600, 200);
     ctx.font = '10pt Arial';
@@ -283,10 +285,12 @@ describe('TabNote', () => {
     voice.addTickables(notes);
     new Formatter().joinVoices([voice]).formatToStave([voice], stave);
     voice.draw(ctx, stave);
+
+    await expectMatchingScreenshot(options, 'tabnote_tests.test.ts');
     assert.ok(true, 'TabNotes successfully drawn');
   });
 
-  runTest('TabNote Stems Down', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('TabNote Stems Down', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const ctx = contextBuilder(options.elementId, 600, 200);
     ctx.font = '10pt Arial';
@@ -357,10 +361,12 @@ describe('TabNote', () => {
     voice.addTickables(notes);
     new Formatter().joinVoices([voice]).formatToStave([voice], stave);
     voice.draw(ctx, stave);
+
+    await expectMatchingScreenshot(options, 'tabnote_tests.test.ts');
     assert.ok(true, 'All objects have been drawn');
   });
 
-  runTest('TabNote Stems Up Through Stave', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('TabNote Stems Up Through Stave', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const ctx = contextBuilder(options.elementId, 600, 200);
     ctx.font = '10pt Arial';
@@ -432,10 +438,12 @@ describe('TabNote', () => {
     voice.addTickables(notes);
     new Formatter().joinVoices([voice]).formatToStave([voice], stave);
     voice.draw(ctx, stave);
+
+    await expectMatchingScreenshot(options, 'tabnote_tests.test.ts');
     assert.ok(true, 'TabNotes successfully drawn');
   });
 
-  runTest('TabNote Stems Down Through Stave', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('TabNote Stems Down Through Stave', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const ctx = contextBuilder(options.elementId, 600, 250);
     ctx.font = '10pt Arial';
@@ -512,10 +520,12 @@ describe('TabNote', () => {
     voice.addTickables(notes);
     new Formatter().joinVoices([voice]).formatToStave([voice], stave);
     voice.draw(ctx, stave);
+
+    await expectMatchingScreenshot(options, 'tabnote_tests.test.ts');
     assert.ok(true, 'All objects have been drawn');
   });
 
-  runTest('TabNote Stems with Dots', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('TabNote Stems with Dots', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const ctx = contextBuilder(options.elementId, 600, 200);
     ctx.font = '10pt Arial';
@@ -564,6 +574,8 @@ describe('TabNote', () => {
     voice.addTickables(notes);
     new Formatter().joinVoices([voice]).formatToStave([voice], stave);
     voice.draw(ctx, stave);
+
+    await expectMatchingScreenshot(options, 'tabnote_tests.test.ts');
     assert.ok(true, 'TabNotes successfully drawn');
   });
 });

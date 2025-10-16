@@ -11,11 +11,11 @@ import { Flow } from '../src/flow';
 import { Note } from '../src/note';
 import { Renderer } from '../src/renderer';
 import { Tickable } from '../src/tickable';
-import { createAssert, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
+import { createAssert, expectMatchingScreenshot, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
 
 describe('VibratoBracket', () => {
   // Helper function to run a test with multiple backends and font stacks
-  function runTest(
+  async function runTest(
     testName: string,
     noteGroup: string,
     setupVibratoBracket: (f: Factory, notes: Tickable[]) => void,
@@ -26,7 +26,7 @@ describe('VibratoBracket', () => {
   ) {
     backends.forEach(({ backend, fontStacks }) => {
       fontStacks.forEach((fontStackName) => {
-        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, async () => {
           const elementId = generateTestID('vibratobracket_test');
 
           // Create the DOM element before the test runs
@@ -41,7 +41,14 @@ describe('VibratoBracket', () => {
 
           try {
             const assert = createAssert();
-            const factory = makeFactory(backend, elementId, 650, 200);
+            const options: TestOptions = {
+              elementId,
+              params: {},
+              backend,
+              testName,
+              fontStackName,
+            };
+            const factory = makeFactory(backend, elementId, 650, 200, options);
             const stave = factory.Stave();
             const score = factory.EasyScore();
             const voice = score.voice(score.notes(noteGroup));
@@ -50,6 +57,8 @@ describe('VibratoBracket', () => {
 
             factory.Formatter().joinVoices([voice]).formatToStave([voice], stave);
             factory.draw();
+
+            await expectMatchingScreenshot(options, 'vibratobracket_tests.test.ts');
 
             assert.ok(true);
           } finally {

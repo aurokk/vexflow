@@ -9,7 +9,7 @@ import { describe, test } from 'vitest';
 
 import { Flow } from '../src/flow';
 import { ContextBuilder, Renderer } from '../src/renderer';
-import { createAssert, FONT_STACKS, generateTestID, TestOptions } from './vitest_test_helpers';
+import { createAssert, expectMatchingScreenshot, FONT_STACKS, generateTestID, TestOptions } from './vitest_test_helpers';
 
 /**
  * Size the context to fit all the points and a small margin.
@@ -113,9 +113,9 @@ const cubicParams = [
 
 describe('BoundingBoxComputation', () => {
   // Helper function to run a test with multiple backends and font stacks
-  function runTest(
+  async function runTest(
     testName: string,
-    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void | Promise<void>,
     backends: Array<{ backend: number; fontStacks: string[] }> = [
       { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
       { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
@@ -123,7 +123,7 @@ describe('BoundingBoxComputation', () => {
   ) {
     backends.forEach(({ backend, fontStacks }) => {
       fontStacks.forEach((fontStackName) => {
-        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, async () => {
           const elementId = generateTestID('boundingboxcomputation_test');
 
           // Create the DOM element before the test runs
@@ -133,7 +133,7 @@ describe('BoundingBoxComputation', () => {
           document.body.appendChild(element);
 
           const assert = createAssert();
-          const options: TestOptions = { elementId, params: {}, backend };
+          const options: TestOptions = { elementId, params: {}, backend, testName, fontStackName };
 
           // Set font stack
           const originalFontNames = Flow.getMusicFont();
@@ -142,7 +142,7 @@ describe('BoundingBoxComputation', () => {
           try {
             const contextBuilder: ContextBuilder =
               backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
-            testFunc(options, contextBuilder);
+            await testFunc(options, contextBuilder);
           } finally {
             // Restore original font
             Flow.setMusicFont(...originalFontNames);
@@ -171,7 +171,7 @@ describe('BoundingBoxComputation', () => {
   });
 
   quadraticParams.forEach((params, index) => {
-    runTest(`Quadratic Test ${index}`, (options: TestOptions, contextBuilder: ContextBuilder) => {
+    runTest(`Quadratic Test ${index}`, async (options: TestOptions, contextBuilder: ContextBuilder) => {
       const assert = createAssert();
       const points = params.points;
       const box = params.box;
@@ -210,6 +210,8 @@ describe('BoundingBoxComputation', () => {
       ctx.lineTo(x2, y2);
       ctx.stroke();
 
+      await expectMatchingScreenshot(options, 'boundingboxcomputation_tests.test.ts');
+
       // Check the expected and computed bounding boxes are close enough.
       assert.ok(Math.abs(bboxComp.getX1() - box[0]) < 0.01, `Bad X1: ${bboxComp.getX1()}`);
       assert.ok(Math.abs(bboxComp.getY1() - box[1]) < 0.01, `Bad Y1: ${bboxComp.getY1()}`);
@@ -224,7 +226,7 @@ describe('BoundingBoxComputation', () => {
   });
 
   cubicParams.forEach((params, index) => {
-    runTest(`Cubic Test ${index}`, (options: TestOptions, contextBuilder: ContextBuilder) => {
+    runTest(`Cubic Test ${index}`, async (options: TestOptions, contextBuilder: ContextBuilder) => {
       const assert = createAssert();
       const points = params.points;
       const box = params.box;
@@ -263,6 +265,8 @@ describe('BoundingBoxComputation', () => {
       ctx.lineTo(x2, y2);
       ctx.lineTo(x3, y3);
       ctx.stroke();
+
+      await expectMatchingScreenshot(options, 'boundingboxcomputation_tests.test.ts');
 
       // Check the expected and computed bounding boxes are close enough.
       assert.ok(Math.abs(bboxComp.getX1() - box[0]) < 0.01, `Bad X1: ${bboxComp.getX1()}`);

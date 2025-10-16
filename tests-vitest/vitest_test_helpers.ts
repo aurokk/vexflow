@@ -19,6 +19,9 @@ export interface TestOptions {
   contextBuilder?: ContextBuilder;
   testName?: string;
   fontStackName?: string;
+  width?: number;
+  height?: number;
+  scale?: number;
 }
 
 // Vitest assert object that mimics QUnit's assert
@@ -97,7 +100,18 @@ export function createTest(elementId: string, testTitle: string, tagName: string
   return vexOutput;
 }
 
-export function makeFactory(backend: number, elementId: string, width: number = 450, height: number = 140): Factory {
+export function makeFactory(
+  backend: number,
+  elementId: string,
+  width: number = 450,
+  height: number = 140,
+  testOptions?: TestOptions
+): Factory {
+  // Store dimensions in testOptions for screenshot comparison
+  if (testOptions) {
+    testOptions.width = width;
+    testOptions.height = height;
+  }
   return new Factory({ renderer: { elementId, backend, width, height } });
 }
 
@@ -343,9 +357,21 @@ export async function expectMatchingScreenshot(
     expect(diffPercentage).toMatchScreenshotWithinPercent(threshold);
   } else if (options.backend === Renderer.Backends.SVG) {
     const div = document.getElementById(options.elementId) as HTMLDivElement;
-    const scale = 2;
-    const width = 700 * scale;
-    const height = 240 * scale;
+    const svg = div.querySelector('svg') as SVGSVGElement;
+
+    if (!svg) {
+      throw new Error(`No SVG element found in ${options.elementId}`);
+    }
+
+    // Extract dimensions directly from the SVG element
+    const svgWidth = parseFloat(svg.getAttribute('width') || '700');
+    const svgHeight = parseFloat(svg.getAttribute('height') || '240');
+
+    // Use scale from options if available, otherwise default to 2x for higher quality screenshots
+    const scale = options.scale ?? 2;
+    const width = Math.round(svgWidth * scale);
+    const height = Math.round(svgHeight * scale);
+
     const filepath = `tests-vitest/__screenshots__/${testFilename}/${options.testName} - SVG - ${options.fontStackName}.png`;
 
     const newpng = await captureSvgScreenshot(div.innerHTML, width, height);

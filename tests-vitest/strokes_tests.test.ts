@@ -9,13 +9,20 @@ import { describe, test } from 'vitest';
 
 import { Flow } from '../src/flow';
 import { ContextBuilder, Renderer } from '../src/renderer';
-import { createAssert, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
+import {
+  createAssert,
+  expectMatchingScreenshot,
+  FONT_STACKS,
+  generateTestID,
+  makeFactory,
+  TestOptions,
+} from './vitest_test_helpers';
 
 describe('Strokes', () => {
   // Helper function to run a test with multiple backends and font stacks
-  function runTest(
+  async function runTest(
     testName: string,
-    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void | Promise<void>,
     backends: Array<{ backend: number; fontStacks: string[] }> = [
       { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
       { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
@@ -23,7 +30,7 @@ describe('Strokes', () => {
   ) {
     backends.forEach(({ backend, fontStacks }) => {
       fontStacks.forEach((fontStackName) => {
-        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, async () => {
           const elementId = generateTestID('strokes_test');
 
           // Create the DOM element before the test runs
@@ -32,8 +39,13 @@ describe('Strokes', () => {
           element.id = elementId;
           document.body.appendChild(element);
 
-          const assert = createAssert();
-          const options: TestOptions = { elementId, params: {}, backend };
+          const options: TestOptions = {
+            elementId,
+            params: {},
+            backend,
+            testName,
+            fontStackName,
+          };
 
           // Set font stack
           const originalFontNames = Flow.getMusicFont();
@@ -42,7 +54,7 @@ describe('Strokes', () => {
           try {
             const contextBuilder: ContextBuilder =
               backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
-            testFunc(options, contextBuilder);
+            await testFunc(options, contextBuilder);
           } finally {
             // Restore original font
             Flow.setMusicFont(...originalFontNames);
@@ -54,9 +66,9 @@ describe('Strokes', () => {
     });
   }
 
-  runTest('Strokes - Brush/Roll/Rasquedo', (options: TestOptions) => {
+  runTest('Strokes - Brush/Roll/Rasquedo', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 600, 200);
+    const f = makeFactory(options.backend, options.elementId, 600, 200, options);
     const score = f.EasyScore();
 
     // bar 1
@@ -99,12 +111,14 @@ describe('Strokes', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'strokes_tests.test.ts');
+
     assert.ok(true, 'Brush/Roll/Rasquedo');
   });
 
-  runTest('Strokes - Arpeggio directionless (without arrows)', (options: TestOptions) => {
+  runTest('Strokes - Arpeggio directionless (without arrows)', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 700, 200);
+    const f = makeFactory(options.backend, options.elementId, 700, 200, options);
     const score = f.EasyScore();
 
     // bar 1
@@ -146,12 +160,14 @@ describe('Strokes', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'strokes_tests.test.ts');
+
     assert.ok(true, 'Arpeggio directionless (without arrows)');
   });
 
-  runTest('Strokes - Multi Voice', (options: TestOptions) => {
+  runTest('Strokes - Multi Voice', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 500, 200);
+    const f = makeFactory(options.backend, options.elementId, 500, 200, options);
     const score = f.EasyScore();
     const stave = f.Stave();
 
@@ -176,12 +192,14 @@ describe('Strokes', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'strokes_tests.test.ts');
+
     assert.ok(true, 'Strokes Test Multi Voice');
   });
 
-  runTest('Strokes - Notation and Tab', (options: TestOptions) => {
+  runTest('Strokes - Notation and Tab', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 500, 300);
+    const f = makeFactory(options.backend, options.elementId, 500, 300, options);
 
     const stave = f.Stave({ x: 15, y: 40, width: 450 }).addClef('treble');
 
@@ -307,12 +325,14 @@ describe('Strokes', () => {
       beam.setContext(f.getContext()).draw();
     });
 
+    await expectMatchingScreenshot(options, 'strokes_tests.test.ts');
+
     assert.ok(true);
   });
 
-  runTest('Strokes - Multi-Voice Notation and Tab', (options: TestOptions) => {
+  runTest('Strokes - Multi-Voice Notation and Tab', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 400, 275);
+    const f = makeFactory(options.backend, options.elementId, 400, 275, options);
     const score = f.EasyScore();
     const stave = f.Stave().addClef('treble');
 
@@ -381,6 +401,8 @@ describe('Strokes', () => {
     f.Formatter().joinVoices(voices).formatToStave(voices, stave);
 
     f.draw();
+
+    await expectMatchingScreenshot(options, 'strokes_tests.test.ts');
 
     assert.ok(true, 'Strokes Test Notation & Tab Multi Voice');
   });

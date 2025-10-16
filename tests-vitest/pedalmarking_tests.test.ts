@@ -10,15 +10,15 @@ import { Flow } from '../src/flow';
 import { ContextBuilder, Renderer } from '../src/renderer';
 import { StaveNote } from '../src/stavenote';
 import { Tickable } from '../src/tickable';
-import { createAssert, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
+import { createAssert, expectMatchingScreenshot, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
 
-function createTest(
+async function createTest(
   makePedal: (f: Factory, v1: Tickable[], v2: Tickable[]) => void,
   options: TestOptions,
   contextBuilder: ContextBuilder
 ) {
   const assert = createAssert();
-  const f = makeFactory(options.backend, options.elementId, 550, 200);
+  const f = makeFactory(options.backend, options.elementId, 550, 200, options);
   const score = f.EasyScore();
 
   const stave0 = f.Stave({ width: 250 }).addClef('treble');
@@ -32,6 +32,8 @@ function createTest(
   makePedal(f, voice0.getTickables(), voice1.getTickables());
 
   f.draw();
+
+  await expectMatchingScreenshot(options, 'pedalmarking_tests.test.ts');
 
   assert.ok(true, 'Must render');
 }
@@ -54,7 +56,7 @@ function withReleaseAndDepressedPedal(style: string) {
 
 describe('PedalMarking', () => {
   // Helper function to run a test with multiple backends and font stacks
-  function runTest(
+  async function runTest(
     testName: string,
     makePedal: (f: Factory, v1: Tickable[], v2: Tickable[]) => void,
     backends: Array<{ backend: number; fontStacks: string[] }> = [
@@ -64,7 +66,7 @@ describe('PedalMarking', () => {
   ) {
     backends.forEach(({ backend, fontStacks }) => {
       fontStacks.forEach((fontStackName) => {
-        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, async () => {
           const elementId = generateTestID('pedalmarking_test');
 
           // Create the DOM element before the test runs
@@ -73,7 +75,13 @@ describe('PedalMarking', () => {
           element.id = elementId;
           document.body.appendChild(element);
 
-          const options: TestOptions = { elementId, params: {}, backend };
+          const options: TestOptions = {
+            elementId,
+            params: {},
+            backend,
+            testName,
+            fontStackName,
+          };
 
           // Set font stack
           const originalFontNames = Flow.getMusicFont();
@@ -82,7 +90,7 @@ describe('PedalMarking', () => {
           try {
             const contextBuilder: ContextBuilder =
               backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
-            createTest(makePedal, options, contextBuilder);
+            await createTest(makePedal, options, contextBuilder);
           } finally {
             // Restore original font
             Flow.setMusicFont(...originalFontNames);

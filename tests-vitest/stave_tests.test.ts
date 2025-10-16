@@ -22,13 +22,13 @@ import { StaveTempoOptions } from '../src/stavetempo';
 import { VoltaType } from '../src/stavevolta';
 import { TextJustification } from '../src/textnote';
 import { TimeSignature } from '../src/timesignature';
-import { createAssert, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
+import { createAssert, expectMatchingScreenshot, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
 
 describe('Stave', () => {
   // Helper function to run a test with multiple backends and font stacks
-  function runTest(
+  async function runTest(
     testName: string,
-    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void | Promise<void>,
     params: any = {},
     backends: Array<{ backend: number; fontStacks: string[] }> = [
       { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
@@ -37,7 +37,7 @@ describe('Stave', () => {
   ) {
     backends.forEach(({ backend, fontStacks }) => {
       fontStacks.forEach((fontStackName) => {
-        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, async () => {
           const elementId = generateTestID('stave_test');
 
           // Create the DOM element before the test runs
@@ -46,7 +46,7 @@ describe('Stave', () => {
           element.id = elementId;
           document.body.appendChild(element);
 
-          const options: TestOptions = { elementId, params, backend };
+          const options: TestOptions = { elementId, params, backend, testName, fontStackName };
 
           // Set font stack
           const originalFontNames = Flow.getMusicFont();
@@ -55,7 +55,7 @@ describe('Stave', () => {
           try {
             const contextBuilder: ContextBuilder =
               backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
-            testFunc(options, contextBuilder);
+            await testFunc(options, contextBuilder);
           } finally {
             // Restore original font
             Flow.setMusicFont(...originalFontNames);
@@ -138,12 +138,14 @@ describe('Stave', () => {
     Flow.setMusicFont(...originalFontNames);
   });
 
-  runTest('Stave Draw Test', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Stave Draw Test', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const ctx = contextBuilder(options.elementId, 400, 150);
     const stave = new Stave(10, 10, 300);
     stave.setContext(ctx);
     stave.draw();
+
+    await expectMatchingScreenshot(options, 'stave_tests.test.ts');
 
     assert.equal(stave.getYForNote(0), 100, 'getYForNote(0)');
     assert.equal(stave.getYForLine(5), 100, 'getYForLine(5)');
@@ -153,7 +155,7 @@ describe('Stave', () => {
     assert.ok(true, 'all pass');
   });
 
-  runTest('Open Stave Draw Test', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Open Stave Draw Test', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const ctx = contextBuilder(options.elementId, 400, 350);
     let stave = new Stave(10, 10, 300, { left_bar: false });
@@ -164,10 +166,12 @@ describe('Stave', () => {
     stave.setContext(ctx);
     stave.draw();
 
+    await expectMatchingScreenshot(options, 'stave_tests.test.ts');
+
     assert.ok(true, 'all pass');
   });
 
-  runTest('Multiple Stave Barline Test', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Multiple Stave Barline Test', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     assert.ok(true);
 
@@ -221,11 +225,13 @@ describe('Stave', () => {
     // Render beams
     beam1.setContext(ctx).draw();
     beam2.setContext(ctx).draw();
+
+    await expectMatchingScreenshot(options, 'stave_tests.test.ts');
   });
 
   runTest(
     'Multiple Stave Barline Test (14pt Section)',
-    (options: TestOptions, contextBuilder: ContextBuilder) => {
+    async (options: TestOptions, contextBuilder: ContextBuilder) => {
       const assert = createAssert();
       assert.ok(true);
 
@@ -279,11 +285,13 @@ describe('Stave', () => {
       // Render beams
       beam1.setContext(ctx).draw();
       beam2.setContext(ctx).draw();
+
+      await expectMatchingScreenshot(options, 'stave_tests.test.ts');
     },
     { fontSize: 14 }
   );
 
-  runTest('Multiple Stave Repeats Test', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Multiple Stave Repeats Test', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     assert.ok(true);
 
@@ -367,9 +375,11 @@ describe('Stave', () => {
 
     // Helper function to justify and draw a 4/4 voice
     Formatter.FormatAndDraw(ctx, staveBar4, notesBar4);
+
+    await expectMatchingScreenshot(options, 'stave_tests.test.ts');
   });
 
-  runTest('Stave End Modifiers Test', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Stave End Modifiers Test', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     assert.ok(true);
 
@@ -491,11 +501,13 @@ describe('Stave', () => {
     x = 10;
     // Fourth pair of staves, with "two dots" on each side of the barlines.
     drawStavesInTwoLines(BarlineType.REPEAT_BOTH);
+
+    await expectMatchingScreenshot(options, 'stave_tests.test.ts');
   });
 
   runTest(
     'Stave Repetition (CODA) Positioning',
-    (options: TestOptions, contextBuilder: ContextBuilder) => {
+    async (options: TestOptions, contextBuilder: ContextBuilder) => {
       const assert = createAssert();
       assert.ok(true);
 
@@ -558,13 +570,15 @@ describe('Stave', () => {
       ];
       // Helper function to justify and draw a 4/4 voice
       Formatter.FormatAndDraw(ctx, mm4, notesmm4);
+
+      await expectMatchingScreenshot(options, 'stave_tests.test.ts');
     },
     { yShift: 0 }
   );
 
   runTest(
     'Stave Repetition (CODA) Positioning (-20)',
-    (options: TestOptions, contextBuilder: ContextBuilder) => {
+    async (options: TestOptions, contextBuilder: ContextBuilder) => {
       const assert = createAssert();
       assert.ok(true);
 
@@ -627,13 +641,15 @@ describe('Stave', () => {
       ];
       // Helper function to justify and draw a 4/4 voice
       Formatter.FormatAndDraw(ctx, mm4, notesmm4);
+
+      await expectMatchingScreenshot(options, 'stave_tests.test.ts');
     },
     { yShift: -20 }
   );
 
   runTest(
     'Stave Repetition (CODA) Positioning (+10)',
-    (options: TestOptions, contextBuilder: ContextBuilder) => {
+    async (options: TestOptions, contextBuilder: ContextBuilder) => {
       const assert = createAssert();
       assert.ok(true);
 
@@ -696,11 +712,13 @@ describe('Stave', () => {
       ];
       // Helper function to justify and draw a 4/4 voice
       Formatter.FormatAndDraw(ctx, mm4, notesmm4);
+
+      await expectMatchingScreenshot(options, 'stave_tests.test.ts');
     },
     { yShift: +10 }
   );
 
-  runTest('Multiple Staves Volta Test', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Multiple Staves Volta Test', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     assert.ok(true);
 
@@ -798,9 +816,11 @@ describe('Stave', () => {
 
     // Helper function to justify and draw a 4/4 voice
     Formatter.FormatAndDraw(ctx, mm9, notesmm9);
+
+    await expectMatchingScreenshot(options, 'stave_tests.test.ts');
   });
 
-  runTest('Volta + Modifier Measure Test', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Volta + Modifier Measure Test', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     assert.ok(true);
 
@@ -876,9 +896,11 @@ describe('Stave', () => {
     mm6.setContext(ctx).draw();
     const notesmm6 = [new StaveNote({ keys: ['c/4'], duration: 'w' })];
     Formatter.FormatAndDraw(ctx, mm6, notesmm6);
+
+    await expectMatchingScreenshot(options, 'stave_tests.test.ts');
   });
 
-  runTest('Tempo Test', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Tempo Test', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     assert.ok(true);
 
@@ -936,9 +958,11 @@ describe('Stave', () => {
       new StaveNote({ keys: ['g/4'], duration: '8' }),
       new StaveNote({ keys: ['e/4'], duration: '8' }),
     ]);
+
+    await expectMatchingScreenshot(options, 'stave_tests.test.ts');
   });
 
-  runTest('Single Line Configuration Test', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Single Line Configuration Test', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const ctx = contextBuilder(options.elementId, 400, 120);
     const stave = new Stave(10, 10, 300);
@@ -950,6 +974,8 @@ describe('Stave', () => {
       .setConfigForLine(4, { visible: true });
     stave.setContext(ctx).draw();
 
+    await expectMatchingScreenshot(options, 'stave_tests.test.ts');
+
     const config = stave.getConfigForLines();
     assert.equal(config[0].visible, true, 'getLinesConfiguration() - Line 0');
     assert.equal(config[1].visible, false, 'getLinesConfiguration() - Line 1');
@@ -960,7 +986,7 @@ describe('Stave', () => {
     assert.ok(true, 'all pass');
   });
 
-  runTest('Batch Line Configuration Test', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Batch Line Configuration Test', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const ctx = contextBuilder(options.elementId, 400, 120);
     const stave = new Stave(10, 10, 300);
@@ -968,6 +994,8 @@ describe('Stave', () => {
       .setConfigForLines([{ visible: false }, {}, { visible: false }, { visible: true }, { visible: false }])
       .setContext(ctx)
       .draw();
+
+    await expectMatchingScreenshot(options, 'stave_tests.test.ts');
 
     const config = stave.getConfigForLines();
     assert.equal(config[0].visible, false, 'getLinesConfiguration() - Line 0');
@@ -979,7 +1007,7 @@ describe('Stave', () => {
     assert.ok(true, 'all pass');
   });
 
-  runTest('Stave Text Test', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Stave Text Test', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const ctx = contextBuilder(options.elementId, 900, 140);
     const stave = new Stave(300, 10, 300);
@@ -989,10 +1017,12 @@ describe('Stave', () => {
     stave.setText('Below Text', Modifier.Position.BELOW);
     stave.setContext(ctx).draw();
 
+    await expectMatchingScreenshot(options, 'stave_tests.test.ts');
+
     assert.ok(true, 'all pass');
   });
 
-  runTest('Multiple Line Stave Text Test', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Multiple Line Stave Text Test', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const ctx = contextBuilder(options.elementId, 900, 200);
     const stave = new Stave(300, 40, 300);
@@ -1006,16 +1036,20 @@ describe('Stave', () => {
     stave.setText('Right Below Text', Modifier.Position.BELOW, { shift_y: 10, justification: TextJustification.RIGHT });
     stave.setContext(ctx).draw();
 
+    await expectMatchingScreenshot(options, 'stave_tests.test.ts');
+
     assert.ok(true, 'all pass');
   });
 
-  runTest('Factory API', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Factory API', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 900, 200);
+    const f = makeFactory(options.backend, options.elementId, 900, 200, options);
     const stave = f.Stave({ x: 300, y: 40, width: 300 });
     stave.setText('Violin', Modifier.Position.LEFT, { shift_y: -10 });
     stave.setText('2nd line', Modifier.Position.LEFT, { shift_y: 10 });
     f.draw();
+
+    await expectMatchingScreenshot(options, 'stave_tests.test.ts');
 
     assert.ok(true, 'all pass');
   });

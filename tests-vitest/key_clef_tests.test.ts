@@ -11,7 +11,7 @@ import { Glyph } from '../src/glyph';
 import { KeySignature } from '../src/keysignature';
 import { ContextBuilder, Renderer } from '../src/renderer';
 import { Stave } from '../src/stave';
-import { createAssert, FONT_STACKS, generateTestID, MAJOR_KEYS, MINOR_KEYS, TestOptions } from './vitest_test_helpers';
+import { createAssert, expectMatchingScreenshot, FONT_STACKS, generateTestID, MAJOR_KEYS, MINOR_KEYS, TestOptions } from './vitest_test_helpers';
 
 
 const fontWidths = () => {
@@ -26,9 +26,9 @@ const fontWidths = () => {
 
 describe('Clef Keys', () => {
   // Helper function to run a test with multiple backends and font stacks
-  function runTest(
+  async function runTest(
     testName: string,
-    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void | Promise<void>,
     backends: Array<{ backend: number; fontStacks: string[] }> = [
       { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
       { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
@@ -36,7 +36,7 @@ describe('Clef Keys', () => {
   ) {
     backends.forEach(({ backend, fontStacks }) => {
       fontStacks.forEach((fontStackName) => {
-        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, async () => {
           const elementId = generateTestID('key_clef_test');
 
           // Create the DOM element before the test runs
@@ -45,8 +45,13 @@ describe('Clef Keys', () => {
           element.id = elementId;
           document.body.appendChild(element);
 
-          const assert = createAssert();
-          const options: TestOptions = { elementId, params: {}, backend };
+          const options: TestOptions = {
+            elementId,
+            params: {},
+            backend,
+            testName,
+            fontStackName,
+          };
 
           // Set font stack
           const originalFontNames = Flow.getMusicFont();
@@ -55,7 +60,7 @@ describe('Clef Keys', () => {
           try {
             const contextBuilder: ContextBuilder =
               backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
-            testFunc(options, contextBuilder);
+            await testFunc(options, contextBuilder);
           } finally {
             // Restore original font
             Flow.setMusicFont(...originalFontNames);
@@ -67,7 +72,7 @@ describe('Clef Keys', () => {
     });
   }
 
-  runTest('Major Key Clef Test', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Major Key Clef Test', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const w = fontWidths();
     const accidentalCount = 28; // total number in all the keys
@@ -127,10 +132,13 @@ describe('Clef Keys', () => {
       staves[i + clefs.length].setContext(ctx);
       staves[i + clefs.length].draw();
     }
+
+    await expectMatchingScreenshot(options, 'key_clef_tests.test.ts');
+
     assert.ok(true, 'all pass');
   });
 
-  runTest('Minor Key Clef Test', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Minor Key Clef Test', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const w = fontWidths();
     const accidentalCount = 28; // total number in all the keys
@@ -190,10 +198,13 @@ describe('Clef Keys', () => {
       staves[i + clefs.length].setContext(ctx);
       staves[i + clefs.length].draw();
     }
+
+    await expectMatchingScreenshot(options, 'key_clef_tests.test.ts');
+
     assert.ok(true, 'all pass');
   });
 
-  runTest('Stave Helper', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Stave Helper', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const w = fontWidths();
     const accidentalCount = 28; // total number in all the keys
@@ -230,6 +241,8 @@ describe('Clef Keys', () => {
     stave3.draw();
     stave4.setContext(ctx);
     stave4.draw();
+
+    await expectMatchingScreenshot(options, 'key_clef_tests.test.ts');
 
     assert.ok(true, 'all pass');
   });

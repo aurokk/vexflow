@@ -13,13 +13,13 @@ import { ContextBuilder, Renderer } from '../src/renderer';
 import { Stave } from '../src/stave';
 import { BarlineType } from '../src/stavebarline';
 import { StaveConnector } from '../src/staveconnector';
-import { createAssert, FONT_STACKS, generateTestID, TestOptions } from './vitest_test_helpers';
+import { createAssert, expectMatchingScreenshot, FONT_STACKS, generateTestID, TestOptions } from './vitest_test_helpers';
 
 describe('StaveConnector', () => {
   // Helper function to run a test with multiple backends and font stacks
-  function runTest(
+  async function runTest(
     testName: string,
-    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void | Promise<void>,
     backends: Array<{ backend: number; fontStacks: string[] }> = [
       { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
       { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
@@ -27,7 +27,7 @@ describe('StaveConnector', () => {
   ) {
     backends.forEach(({ backend, fontStacks }) => {
       fontStacks.forEach((fontStackName) => {
-        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, async () => {
           const elementId = generateTestID('staveconnector_test');
 
           // Create the DOM element before the test runs
@@ -37,7 +37,7 @@ describe('StaveConnector', () => {
           document.body.appendChild(element);
 
           const assert = createAssert();
-          const options: TestOptions = { elementId, params: {}, backend };
+          const options: TestOptions = { elementId, params: {}, backend, testName, fontStackName };
 
           // Set font stack
           const originalFontNames = Flow.getMusicFont();
@@ -46,7 +46,7 @@ describe('StaveConnector', () => {
           try {
             const contextBuilder: ContextBuilder =
               backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
-            testFunc(options, contextBuilder);
+            await testFunc(options, contextBuilder);
           } finally {
             // Restore original font
             Flow.setMusicFont(...originalFontNames);
@@ -58,7 +58,7 @@ describe('StaveConnector', () => {
     });
   }
 
-  runTest('Single Draw Test', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Single Draw Test', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const ctx = contextBuilder(options.elementId, 400, 300);
     const stave1 = new Stave(25, 10, 300);
@@ -72,10 +72,11 @@ describe('StaveConnector', () => {
     stave2.draw();
     connector.draw();
 
+    await expectMatchingScreenshot(options, 'staveconnector_tests.test.ts');
     assert.ok(true, 'all pass');
   });
 
-  runTest('Single Draw Test, 4px Stave Line Thickness', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Single Draw Test, 4px Stave Line Thickness', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const oldThickness = Flow.STAVE_LINE_THICKNESS;
     Flow.STAVE_LINE_THICKNESS = 4;
@@ -92,10 +93,11 @@ describe('StaveConnector', () => {
     connector.draw();
     Flow.STAVE_LINE_THICKNESS = oldThickness;
 
+    await expectMatchingScreenshot(options, 'staveconnector_tests.test.ts');
     assert.ok(true, 'all pass');
   });
 
-  runTest('Single Both Sides Test', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Single Both Sides Test', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const ctx = contextBuilder(options.elementId, 400, 300);
     const stave1 = new Stave(25, 10, 300);
@@ -113,10 +115,11 @@ describe('StaveConnector', () => {
     connector1.draw();
     connector2.draw();
 
+    await expectMatchingScreenshot(options, 'staveconnector_tests.test.ts');
     assert.ok(true, 'all pass');
   });
 
-  runTest('Double Draw Test', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Double Draw Test', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const ctx = contextBuilder(options.elementId, 400, 300);
     const stave1 = new Stave(25, 10, 300);
@@ -135,10 +138,11 @@ describe('StaveConnector', () => {
     connector.draw();
     line.draw();
 
+    await expectMatchingScreenshot(options, 'staveconnector_tests.test.ts');
     assert.ok(true, 'all pass');
   });
 
-  runTest('Bold Double Line Left Draw Test', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Bold Double Line Left Draw Test', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const ctx = contextBuilder(options.elementId, 400, 300);
     const stave1 = new Stave(25, 10, 300);
@@ -155,10 +159,11 @@ describe('StaveConnector', () => {
     stave2.draw();
     line.draw();
 
+    await expectMatchingScreenshot(options, 'staveconnector_tests.test.ts');
     assert.ok(true, 'all pass');
   });
 
-  runTest('Bold Double Line Right Draw Test', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Bold Double Line Right Draw Test', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const ctx = contextBuilder(options.elementId, 400, 300);
     const stave1 = new Stave(25, 10, 300);
@@ -175,10 +180,11 @@ describe('StaveConnector', () => {
     stave2.draw();
     line.draw();
 
+    await expectMatchingScreenshot(options, 'staveconnector_tests.test.ts');
     assert.ok(true, 'all pass');
   });
 
-  runTest('Thin Double Line Right Draw Test', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Thin Double Line Right Draw Test', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const ctx = contextBuilder(options.elementId, 400, 300);
     const stave1 = new Stave(25, 10, 300);
@@ -195,10 +201,11 @@ describe('StaveConnector', () => {
     stave2.draw();
     line.draw();
 
+    await expectMatchingScreenshot(options, 'staveconnector_tests.test.ts');
     assert.ok(true, 'all pass');
   });
 
-  runTest('Bold Double Lines Overlapping Draw Test', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Bold Double Lines Overlapping Draw Test', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const ctx = contextBuilder(options.elementId, 400, 300);
     const stave1 = new Stave(25, 10, 150);
@@ -240,10 +247,11 @@ describe('StaveConnector', () => {
     connector3.draw();
     connector4.draw();
 
+    await expectMatchingScreenshot(options, 'staveconnector_tests.test.ts');
     assert.ok(true, 'all pass');
   });
 
-  runTest('Bold Double Lines Offset Draw Test', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Bold Double Lines Offset Draw Test', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const ctx = contextBuilder(options.elementId, 400, 300);
     const stave1 = new Stave(25, 10, 150);
@@ -309,10 +317,11 @@ describe('StaveConnector', () => {
     connector4.draw();
     connector5.draw();
 
+    await expectMatchingScreenshot(options, 'staveconnector_tests.test.ts');
     assert.ok(true, 'all pass');
   });
 
-  runTest('Bold Double Lines Offset Draw Test 2', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Bold Double Lines Offset Draw Test 2', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const ctx = contextBuilder(options.elementId, 400, 300);
     const stave1 = new Stave(25, 10, 150);
@@ -375,10 +384,11 @@ describe('StaveConnector', () => {
     connector4.draw();
     connector5.draw();
 
+    await expectMatchingScreenshot(options, 'staveconnector_tests.test.ts');
     assert.ok(true, 'all pass');
   });
 
-  runTest('Brace Draw Test', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Brace Draw Test', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const ctx = contextBuilder(options.elementId, 450, 300);
     const stave1 = new Stave(100, 10, 300);
@@ -398,10 +408,11 @@ describe('StaveConnector', () => {
     connector.draw();
     line.draw();
 
+    await expectMatchingScreenshot(options, 'staveconnector_tests.test.ts');
     assert.ok(true, 'all pass');
   });
 
-  runTest('Brace Wide Draw Test', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Brace Wide Draw Test', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const ctx = contextBuilder(options.elementId, 400, 300);
     const stave1 = new Stave(25, -20, 300);
@@ -420,10 +431,11 @@ describe('StaveConnector', () => {
     connector.draw();
     line.draw();
 
+    await expectMatchingScreenshot(options, 'staveconnector_tests.test.ts');
     assert.ok(true, 'all pass');
   });
 
-  runTest('Bracket Draw Test', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Bracket Draw Test', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const ctx = contextBuilder(options.elementId, 400, 300);
     const stave1 = new Stave(25, 10, 300);
@@ -442,10 +454,11 @@ describe('StaveConnector', () => {
     connector.draw();
     line.draw();
 
+    await expectMatchingScreenshot(options, 'staveconnector_tests.test.ts');
     assert.ok(true, 'all pass');
   });
 
-  runTest('Combined Draw Test', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Combined Draw Test', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const ctx = contextBuilder(options.elementId, 550, 700);
     const stave1 = new Stave(150, 10, 300);
@@ -495,6 +508,7 @@ describe('StaveConnector', () => {
     conn_none.draw();
     conn_brace.draw();
 
+    await expectMatchingScreenshot(options, 'staveconnector_tests.test.ts');
     assert.ok(true, 'all pass');
   });
 });

@@ -24,7 +24,14 @@ import { TabStave } from '../src/tabstave';
 import { Tickable } from '../src/tickable';
 import { Vibrato } from '../src/vibrato';
 import { Voice } from '../src/voice';
-import { createAssert, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
+import {
+  createAssert,
+  expectMatchingScreenshot,
+  FONT_STACKS,
+  generateTestID,
+  makeFactory,
+  TestOptions,
+} from './vitest_test_helpers';
 
 const FONT_SIZE = 10;
 
@@ -34,9 +41,9 @@ const staveNote = (noteStruct: StaveNoteStruct) => new StaveNote(noteStruct);
 
 describe('Annotation', () => {
   // Helper function to run a test with multiple backends and font stacks
-  function runTest(
+  async function runTest(
     testName: string,
-    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void | Promise<void>,
     backends: Array<{ backend: number; fontStacks: string[] }> = [
       { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
       { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
@@ -44,7 +51,7 @@ describe('Annotation', () => {
   ) {
     backends.forEach(({ backend, fontStacks }) => {
       fontStacks.forEach((fontStackName) => {
-        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, async () => {
           const elementId = generateTestID('annotation_test');
 
           // Create the DOM element before the test runs
@@ -53,8 +60,13 @@ describe('Annotation', () => {
           element.id = elementId;
           document.body.appendChild(element);
 
-          const assert = createAssert();
-          const options: TestOptions = { elementId, params: {}, backend };
+          const options: TestOptions = {
+            elementId,
+            params: {},
+            backend,
+            testName,
+            fontStackName,
+          };
 
           // Set font stack
           const originalFontNames = Flow.getMusicFont();
@@ -63,7 +75,7 @@ describe('Annotation', () => {
           try {
             const contextBuilder: ContextBuilder =
               backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
-            testFunc(options, contextBuilder);
+            await testFunc(options, contextBuilder);
           } finally {
             // Restore original font
             Flow.setMusicFont(...originalFontNames);
@@ -78,14 +90,14 @@ describe('Annotation', () => {
   /**
    * Show lyrics using Annotation objects.
    */
-  runTest('Lyrics', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Lyrics', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     let fontSize = FONT_SIZE;
     let x = 10;
     let width = 170;
     let ratio = 1;
     const registry = new Registry();
     Registry.enableDefaultRegistry(registry);
-    const f = makeFactory(options.backend, options.elementId, 750, 260);
+    const f = makeFactory(options.backend, options.elementId, 750, 260, options);
 
     // Add three groups of staves. Each time we increase the fontSize by 2.
     for (let i = 0; i < 3; ++i) {
@@ -121,10 +133,13 @@ describe('Annotation', () => {
       x = x + width;
       fontSize = fontSize + 2;
     }
+
+    await expectMatchingScreenshot(options, 'annotation_tests.test.ts');
+
     createAssert().ok(true);
   });
 
-  runTest('Simple Annotation', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Simple Annotation', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const ctx = contextBuilder(options.elementId, 500, 240);
     ctx.scale(1.5, 1.5);
 
@@ -146,10 +161,13 @@ describe('Annotation', () => {
     ];
 
     Formatter.FormatAndDraw(ctx, stave, notes);
+
+    await expectMatchingScreenshot(options, 'annotation_tests.test.ts');
+
     createAssert().ok(true, 'Simple Annotation');
   });
 
-  runTest('Standard Notation Annotation', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Standard Notation Annotation', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const ctx = contextBuilder(options.elementId, 500, 240);
     ctx.scale(1.5, 1.5);
 
@@ -163,10 +181,13 @@ describe('Annotation', () => {
     ];
 
     Formatter.FormatAndDraw(ctx, stave, notes);
+
+    await expectMatchingScreenshot(options, 'annotation_tests.test.ts');
+
     createAssert().ok(true, 'Standard Notation Annotation');
   });
 
-  runTest('Styled Annotation', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Styled Annotation', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const ctx = contextBuilder(options.elementId, 500, 240);
     ctx.scale(1.5, 1.5);
     const stave = new Stave(10, 10, 450).addClef('treble').setContext(ctx).draw();
@@ -183,10 +204,13 @@ describe('Annotation', () => {
     ];
 
     Formatter.FormatAndDraw(ctx, stave, notes);
+
+    await expectMatchingScreenshot(options, 'annotation_tests.test.ts');
+
     createAssert().ok(true, 'Styled Annotation');
   });
 
-  runTest('Harmonics', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Harmonics', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const ctx = contextBuilder(options.elementId, 500, 240);
     ctx.scale(1.5, 1.5);
 
@@ -210,10 +234,13 @@ describe('Annotation', () => {
     ];
 
     Formatter.FormatAndDraw(ctx, stave, notes);
+
+    await expectMatchingScreenshot(options, 'annotation_tests.test.ts');
+
     createAssert().ok(true, 'Harmonics');
   });
 
-  runTest('Fingerpicking', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Fingerpicking', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const ctx = contextBuilder(options.elementId, 500, 240);
 
     ctx.setFont(Font.SANS_SERIF, FONT_SIZE);
@@ -252,10 +279,13 @@ describe('Annotation', () => {
     ];
 
     Formatter.FormatAndDraw(ctx, stave, notes);
+
+    await expectMatchingScreenshot(options, 'annotation_tests.test.ts');
+
     createAssert().ok(true, 'Fingerpicking');
   });
 
-  runTest('Placement', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Placement', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const ctx = contextBuilder(options.elementId, 750, 300);
 
     const stave = new Stave(10, 50, 750).addClef('treble').setContext(ctx).draw();
@@ -315,10 +345,13 @@ describe('Annotation', () => {
     ];
 
     Formatter.FormatAndDraw(ctx, stave, notes);
+
+    await expectMatchingScreenshot(options, 'annotation_tests.test.ts');
+
     createAssert().ok(true, 'Annotation Placement');
   });
 
-  runTest('Bottom Annotation', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Bottom Annotation', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const ctx = contextBuilder(options.elementId, 500, 240);
     ctx.scale(1.5, 1.5);
 
@@ -335,10 +368,13 @@ describe('Annotation', () => {
     ];
 
     Formatter.FormatAndDraw(ctx, stave, notes);
+
+    await expectMatchingScreenshot(options, 'annotation_tests.test.ts');
+
     createAssert().ok(true, 'Bottom Annotation');
   });
 
-  runTest('Bottom Annotations with Beams', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Bottom Annotations with Beams', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const ctx = contextBuilder(options.elementId, 500, 240);
     ctx.scale(1.5, 1.5);
 
@@ -363,10 +399,13 @@ describe('Annotation', () => {
 
     Formatter.FormatAndDraw(ctx, stave, notes);
     beam.setContext(ctx).draw();
+
+    await expectMatchingScreenshot(options, 'annotation_tests.test.ts');
+
     createAssert().ok(true, 'Bottom Annotation with Beams');
   });
 
-  runTest('Test Justification Annotation Stem Up', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Test Justification Annotation Stem Up', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const ctx = contextBuilder(options.elementId, 650, 950);
     ctx.scale(1.5, 1.5);
 
@@ -389,10 +428,12 @@ describe('Annotation', () => {
       Formatter.FormatAndDraw(ctx, stave, notes);
     }
 
+    await expectMatchingScreenshot(options, 'annotation_tests.test.ts');
+
     createAssert().ok(true, 'Test Justification Annotation');
   });
 
-  runTest('Test Justification Annotation Stem Down', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Test Justification Annotation Stem Down', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const ctx = contextBuilder(options.elementId, 650, 1000);
     ctx.scale(1.5, 1.5);
 
@@ -416,10 +457,12 @@ describe('Annotation', () => {
       Formatter.FormatAndDraw(ctx, stave, notes);
     }
 
+    await expectMatchingScreenshot(options, 'annotation_tests.test.ts');
+
     createAssert().ok(true, 'Test Justification Annotation');
   });
 
-  runTest('TabNote Annotations', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('TabNote Annotations', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const ctx = contextBuilder(options.elementId, 600, 200);
     ctx.font = '10pt Arial, sans-serif';
     const stave = new TabStave(10, 10, 550);
@@ -496,6 +539,8 @@ describe('Annotation', () => {
     new Formatter().joinVoices([voice]).formatToStave([voice], stave, { stave });
 
     voice.draw(ctx, stave);
+
+    await expectMatchingScreenshot(options, 'annotation_tests.test.ts');
 
     createAssert().ok(true, 'TabNotes successfully drawn');
   });

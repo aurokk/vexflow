@@ -15,7 +15,7 @@ import { Renderer } from '../src/renderer';
 import { StaveConnector } from '../src/staveconnector';
 import { Stem } from '../src/stem';
 import { Tuplet } from '../src/tuplet';
-import { createAssert, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
+import { createAssert, expectMatchingScreenshot, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
 
 /**
  * Use Function.prototype.bind() to create shortcut methods.
@@ -32,9 +32,9 @@ function createShortcuts(score: EasyScore) {
 
 describe('EasyScore', () => {
   // Helper function to run a test with multiple backends and font stacks
-  function runTest(
+  async function runTest(
     testName: string,
-    testFunc: (options: TestOptions) => void,
+    testFunc: (options: TestOptions) => void | Promise<void>,
     backends: Array<{ backend: number; fontStacks: string[] }> = [
       { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
       { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
@@ -42,7 +42,7 @@ describe('EasyScore', () => {
   ) {
     backends.forEach(({ backend, fontStacks }) => {
       fontStacks.forEach((fontStackName) => {
-        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, async () => {
           const elementId = generateTestID('easyscore_test');
 
           // Create the DOM element before the test runs
@@ -51,14 +51,14 @@ describe('EasyScore', () => {
           element.id = elementId;
           document.body.appendChild(element);
 
-          const options: TestOptions = { elementId, params: {}, backend };
+          const options: TestOptions = { elementId, params: {}, backend, testName, fontStackName };
 
           // Set font stack
           const originalFontNames = Flow.getMusicFont();
           Flow.setMusicFont(...FONT_STACKS[fontStackName]);
 
           try {
-            testFunc(options);
+            await testFunc(options);
           } finally {
             // Restore original font
             Flow.setMusicFont(...originalFontNames);
@@ -209,9 +209,9 @@ describe('EasyScore', () => {
     mustFail.forEach((line) => assert.equal(score.parse(line).success, false, line));
   });
 
-  runTest('Draw Basic', (options: TestOptions) => {
+  runTest('Draw Basic', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 600, 350);
+    const f = makeFactory(options.backend, options.elementId, 600, 350, options);
     const score = f.EasyScore();
     const system = f.System();
 
@@ -234,12 +234,13 @@ describe('EasyScore', () => {
     system.addConnector().setType(StaveConnector.type.BRACKET);
 
     f.draw();
+    await expectMatchingScreenshot(options, 'easyscore_tests.test.ts');
     assert.ok(true);
   });
 
-  runTest('Draw Different KeySignature', (options: TestOptions) => {
+  runTest('Draw Different KeySignature', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 600, 350);
+    const f = makeFactory(options.backend, options.elementId, 600, 350, options);
     const score = f.EasyScore();
     const system = f.System();
 
@@ -265,12 +266,13 @@ describe('EasyScore', () => {
     system.addConnector().setType(StaveConnector.type.BRACKET);
 
     f.draw();
+    await expectMatchingScreenshot(options, 'easyscore_tests.test.ts');
     assert.ok(true);
   });
 
-  runTest('Draw Basic Muted', (options: TestOptions) => {
+  runTest('Draw Basic Muted', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 600, 350);
+    const f = makeFactory(options.backend, options.elementId, 600, 350, options);
     const score = f.EasyScore();
     const system = f.System();
 
@@ -293,12 +295,13 @@ describe('EasyScore', () => {
     system.addConnector().setType(StaveConnector.type.BRACKET);
 
     f.draw();
+    await expectMatchingScreenshot(options, 'easyscore_tests.test.ts');
     assert.ok(true);
   });
 
-  runTest('Draw Basic Harmonic', (options: TestOptions) => {
+  runTest('Draw Basic Harmonic', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 600, 350);
+    const f = makeFactory(options.backend, options.elementId, 600, 350, options);
     const score = f.EasyScore();
     const system = f.System();
 
@@ -321,12 +324,13 @@ describe('EasyScore', () => {
     system.addConnector().setType(StaveConnector.type.BRACKET);
 
     f.draw();
+    await expectMatchingScreenshot(options, 'easyscore_tests.test.ts');
     assert.ok(true);
   });
 
-  runTest('Draw Basic Slash', (options: TestOptions) => {
+  runTest('Draw Basic Slash', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 600, 350);
+    const f = makeFactory(options.backend, options.elementId, 600, 350, options);
     const score = f.EasyScore();
     const system = f.System();
 
@@ -349,12 +353,13 @@ describe('EasyScore', () => {
     system.addConnector().setType(StaveConnector.type.BRACKET);
 
     f.draw();
+    await expectMatchingScreenshot(options, 'easyscore_tests.test.ts');
     assert.ok(true);
   });
 
-  runTest('Draw Ghostnote Basic', (options: TestOptions) => {
+  runTest('Draw Ghostnote Basic', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 550);
+    const f = makeFactory(options.backend, options.elementId, 550, undefined, options);
     const score = f.EasyScore();
     const system = f.System();
 
@@ -375,12 +380,13 @@ describe('EasyScore', () => {
     });
 
     f.draw();
+    await expectMatchingScreenshot(options, 'easyscore_tests.test.ts');
     assert.ok(true);
   });
 
-  runTest('Draw Ghostnote Dotted', (options: TestOptions) => {
+  runTest('Draw Ghostnote Dotted', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 550);
+    const f = makeFactory(options.backend, options.elementId, 550, undefined, options);
     const score = f.EasyScore();
     const system = f.System();
 
@@ -407,12 +413,13 @@ describe('EasyScore', () => {
     });
 
     f.draw();
+    await expectMatchingScreenshot(options, 'easyscore_tests.test.ts');
     assert.ok(true);
   });
 
-  runTest('Draw Parenthesised', (options: TestOptions) => {
+  runTest('Draw Parenthesised', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 600, 350);
+    const f = makeFactory(options.backend, options.elementId, 600, 350, options);
     const score = f.EasyScore();
     const system = f.System();
 
@@ -439,12 +446,13 @@ describe('EasyScore', () => {
     system.addConnector().setType(StaveConnector.type.BRACKET);
 
     f.draw();
+    await expectMatchingScreenshot(options, 'easyscore_tests.test.ts');
     assert.ok(true);
   });
 
-  runTest('Draw Accidentals', (options: TestOptions) => {
+  runTest('Draw Accidentals', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 600, 350);
+    const f = makeFactory(options.backend, options.elementId, 600, 350, options);
     const score = f.EasyScore();
     const system = f.System();
 
@@ -467,12 +475,13 @@ describe('EasyScore', () => {
     system.addConnector().setType(StaveConnector.type.BRACKET);
 
     f.draw();
+    await expectMatchingScreenshot(options, 'easyscore_tests.test.ts');
     assert.ok(true);
   });
 
-  runTest('Draw Beams', (options: TestOptions) => {
+  runTest('Draw Beams', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 600, 250);
+    const f = makeFactory(options.backend, options.elementId, 600, 250, options);
     const score = f.EasyScore();
     const system = f.System();
 
@@ -488,12 +497,13 @@ describe('EasyScore', () => {
       .addClef('treble');
 
     f.draw();
+    await expectMatchingScreenshot(options, 'easyscore_tests.test.ts');
     assert.ok(true);
   });
 
-  runTest('Draw Tuplets', (options: TestOptions) => {
+  runTest('Draw Tuplets', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 600, 250);
+    const f = makeFactory(options.backend, options.elementId, 600, 250, options);
     const score = f.EasyScore();
     const system = f.System();
 
@@ -514,12 +524,13 @@ describe('EasyScore', () => {
     system.addStave({ voices: [v1, v2] }).addClef('treble');
 
     f.draw();
+    await expectMatchingScreenshot(options, 'easyscore_tests.test.ts');
     assert.ok(true);
   });
 
-  runTest('Draw Dots', (options: TestOptions) => {
+  runTest('Draw Dots', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 600, 250);
+    const f = makeFactory(options.backend, options.elementId, 600, 250, options);
     const score = f.EasyScore();
     const system = f.System();
 
@@ -532,12 +543,13 @@ describe('EasyScore', () => {
       .addClef('treble');
 
     f.draw();
+    await expectMatchingScreenshot(options, 'easyscore_tests.test.ts');
     assert.ok(true);
   });
 
-  runTest('Draw Options', (options: TestOptions) => {
+  runTest('Draw Options', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 500, 200);
+    const f = makeFactory(options.backend, options.elementId, 500, 200, options);
     const score = f.EasyScore();
     const system = f.System();
 
@@ -548,6 +560,7 @@ describe('EasyScore', () => {
     system.addStave({ voices: [score.voice(notes)] });
 
     f.draw();
+    await expectMatchingScreenshot(options, 'easyscore_tests.test.ts');
 
     const note0 = notes[0];
     const note1 = notes[1];
@@ -571,9 +584,9 @@ describe('EasyScore', () => {
     assert.equal(notes[2].getStemDirection(), Stem.DOWN);
   });
 
-  runTest('Draw Fingerings', (options: TestOptions) => {
+  runTest('Draw Fingerings', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 500, 200);
+    const f = makeFactory(options.backend, options.elementId, 500, 200, options);
     const score = f.EasyScore();
     const system = f.System();
 
@@ -584,6 +597,7 @@ describe('EasyScore', () => {
     system.addStave({ voices: [score.voice(notes)] });
 
     f.draw();
+    await expectMatchingScreenshot(options, 'easyscore_tests.test.ts');
 
     const note0_modifier0 = notes[0].getModifiers()[0] as FretHandFinger;
     assert.equal(note0_modifier0.getCategory(), FretHandFinger.CATEGORY);
@@ -615,9 +629,9 @@ describe('EasyScore', () => {
     assert.equal(note3_modifier2.getPosition(), Modifier.Position.LEFT);
   });
 
-  runTest('Keys', (options: TestOptions) => {
+  runTest('Keys', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 700, 200);
+    const f = makeFactory(options.backend, options.elementId, 700, 200, options);
     const score = f.EasyScore();
     const system = f.System();
     const notes = score.notes(
@@ -627,6 +641,7 @@ describe('EasyScore', () => {
 
     system.addStave({ voices: [f.Voice().setStrict(false).addTickables(notes)] }).addClef('bass');
     f.draw();
+    await expectMatchingScreenshot(options, 'easyscore_tests.test.ts');
 
     assert.equal(notes[0].keys[0], 'c#/3');
     assert.equal(notes[1].keys[0], 'c##/3');

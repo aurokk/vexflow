@@ -11,7 +11,7 @@ import { Formatter } from '../src/formatter';
 import { ContextBuilder, Renderer } from '../src/renderer';
 import { Stem } from '../src/stem';
 import { Tuplet } from '../src/tuplet';
-import { createAssert, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
+import { createAssert, expectMatchingScreenshot, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
 
 // Helper Functions to set the stem direction and duration of the options objects (i.e., StaveNoteStruct)
 // that are ultimately passed into Factory.StaveNote().
@@ -27,9 +27,9 @@ const setDurationToQuarterNote = set('duration')('4');
 
 describe('Tuplet', () => {
   // Helper function to run a test with multiple backends and font stacks
-  function runTest(
+  async function runTest(
     testName: string,
-    testFunc: (options: TestOptions) => void,
+    testFunc: (options: TestOptions) => void | Promise<void>,
     backends: Array<{ backend: number; fontStacks: string[] }> = [
       { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
       { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
@@ -37,7 +37,7 @@ describe('Tuplet', () => {
   ) {
     backends.forEach(({ backend, fontStacks }) => {
       fontStacks.forEach((fontStackName) => {
-        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, async () => {
           const elementId = generateTestID('tuplet_test');
 
           // Create the DOM element before the test runs
@@ -46,14 +46,14 @@ describe('Tuplet', () => {
           element.id = elementId;
           document.body.appendChild(element);
 
-          const options: TestOptions = { elementId, params: {}, backend };
+          const options: TestOptions = { elementId, params: {}, backend, testName, fontStackName };
 
           // Set font stack
           const originalFontNames = Flow.getMusicFont();
           Flow.setMusicFont(...FONT_STACKS[fontStackName]);
 
           try {
-            testFunc(options);
+            await testFunc(options);
           } finally {
             // Restore original font
             Flow.setMusicFont(...originalFontNames);
@@ -65,9 +65,9 @@ describe('Tuplet', () => {
     });
   }
 
-  runTest('Simple Tuplet', (options: TestOptions) => {
+  runTest('Simple Tuplet', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId);
+    const f = makeFactory(options.backend, options.elementId, 450, 140, options);
     const stave = f.Stave({ x: 10, y: 10, width: 350 }).addTimeSignature('3/4');
 
     const notes = [
@@ -94,12 +94,14 @@ describe('Tuplet', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'tuplet_tests.test.ts');
+
     assert.ok(true, 'Simple Test');
   });
 
-  runTest('Beamed Tuplet', (options: TestOptions) => {
+  runTest('Beamed Tuplet', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId);
+    const f = makeFactory(options.backend, options.elementId, 450, 140, options);
     const stave = f.Stave({ x: 10, y: 10, width: 350 }).addTimeSignature('3/8');
 
     const notes = [
@@ -132,12 +134,14 @@ describe('Tuplet', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'tuplet_tests.test.ts');
+
     assert.ok(true, 'Beamed Test');
   });
 
-  runTest('Ratioed Tuplet', (options: TestOptions) => {
+  runTest('Ratioed Tuplet', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId);
+    const f = makeFactory(options.backend, options.elementId, 450, 140, options);
     const stave = f.Stave({ x: 10, y: 10, width: 350 }).addTimeSignature('4/4');
 
     const notes = [
@@ -176,12 +180,14 @@ describe('Tuplet', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'tuplet_tests.test.ts');
+
     assert.ok(true, 'Ratioed Test');
   });
 
-  runTest('Bottom Tuplet', (options: TestOptions) => {
+  runTest('Bottom Tuplet', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 350, 160);
+    const f = makeFactory(options.backend, options.elementId, 350, 160, options);
     const stave = f.Stave({ x: 10, y: 10 }).addTimeSignature('3/4');
 
     const notes = [
@@ -218,12 +224,14 @@ describe('Tuplet', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'tuplet_tests.test.ts');
+
     assert.ok(true, 'Bottom Test');
   });
 
-  runTest('Bottom Ratioed Tuplet', (options: TestOptions) => {
+  runTest('Bottom Ratioed Tuplet', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 350, 160);
+    const f = makeFactory(options.backend, options.elementId, 350, 160, options);
     const stave = f.Stave({ x: 10, y: 10 }).addTimeSignature('5/8');
 
     const notes = [
@@ -266,12 +274,14 @@ describe('Tuplet', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'tuplet_tests.test.ts');
+
     assert.ok(true, 'Bottom Ratioed Test');
   });
 
-  runTest('Awkward Tuplet', (options: TestOptions) => {
+  runTest('Awkward Tuplet', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 370, 160);
+    const f = makeFactory(options.backend, options.elementId, 370, 160, options);
     const stave = f.Stave({ x: 10, y: 10 });
 
     const notes = [
@@ -316,12 +326,14 @@ describe('Tuplet', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'tuplet_tests.test.ts');
+
     assert.ok(true, 'Awkward Test');
   });
 
-  runTest('Complex Tuplet', (options: TestOptions) => {
+  runTest('Complex Tuplet', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId, 600);
+    const f = makeFactory(options.backend, options.elementId, 600, 140, options);
     const stave = f.Stave({ x: 10, y: 10 }).addTimeSignature('4/4');
 
     const notes1 = [
@@ -384,12 +396,14 @@ describe('Tuplet', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'tuplet_tests.test.ts');
+
     assert.ok(true, 'Complex Test');
   });
 
-  runTest('Mixed Stem Direction Tuplet', (options: TestOptions) => {
+  runTest('Mixed Stem Direction Tuplet', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId);
+    const f = makeFactory(options.backend, options.elementId, 450, 140, options);
     const stave = f.Stave({ x: 10, y: 10 });
 
     const notes = [
@@ -430,12 +444,14 @@ describe('Tuplet', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'tuplet_tests.test.ts');
+
     assert.ok(true, 'Mixed Stem Direction Tuplet');
   });
 
-  runTest('Mixed Stem Direction Bottom Tuplet', (options: TestOptions) => {
+  runTest('Mixed Stem Direction Bottom Tuplet', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId);
+    const f = makeFactory(options.backend, options.elementId, 450, 140, options);
     const stave = f.Stave({ x: 10, y: 10 });
 
     const notes = [
@@ -476,12 +492,14 @@ describe('Tuplet', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'tuplet_tests.test.ts');
+
     assert.ok(true, 'Mixed Stem Direction Bottom Tuplet');
   });
 
-  runTest('Nested Tuplets', (options: TestOptions) => {
+  runTest('Nested Tuplets', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId);
+    const f = makeFactory(options.backend, options.elementId, 450, 140, options);
     const stave = f.Stave({ x: 10, y: 10 }).addTimeSignature('4/4');
 
     const notes = [
@@ -525,12 +543,14 @@ describe('Tuplet', () => {
 
     f.draw();
 
+    await expectMatchingScreenshot(options, 'tuplet_tests.test.ts');
+
     assert.ok(true, 'Nested Tuplets');
   });
 
-  runTest('Single Tuplets', (options: TestOptions) => {
+  runTest('Single Tuplets', async (options: TestOptions) => {
     const assert = createAssert();
-    const f = makeFactory(options.backend, options.elementId);
+    const f = makeFactory(options.backend, options.elementId, 450, 140, options);
     const stave = f.Stave({ x: 10, y: 10 }).addTimeSignature('4/4');
 
     const notes = [
@@ -600,6 +620,8 @@ describe('Tuplet', () => {
     new Formatter().joinVoices([voice]).formatToStave([voice], stave);
 
     f.draw();
+
+    await expectMatchingScreenshot(options, 'tuplet_tests.test.ts');
 
     assert.ok(true, 'Nested Tuplets');
   });

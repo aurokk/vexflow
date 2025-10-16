@@ -147,9 +147,9 @@
   "scripts": {
     "start": "grunt",
     "test": "grunt test",
-    "test:vitest": "vitest --config vitest.config.dev.ts",
+    "test:vitest": "vitest run --config vitest.config.dev.ts",
     "test:vitest:ci": "vitest run --config vitest.config.ci.ts",
-    "test:vitest:ui": "vitest --ui --config vitest.config.dev.ts",
+    "test:vitest:ui": "vitest run --ui --config vitest.config.dev.ts",
     "test:vitest:watch": "vitest --config vitest.config.dev.ts",
     "test:vitest:clean": "rm -rf tests-vitest/__screenshots__",
     "reference": "grunt reference",

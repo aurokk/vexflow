@@ -13,16 +13,16 @@ import { Formatter } from '../src/formatter';
 import { TabNote, TabNoteStruct } from '../src/tabnote';
 import { TabStave } from '../src/tabstave';
 import { Vibrato } from '../src/vibrato';
-import { createAssert, FONT_STACKS, generateTestID, TestOptions } from './vitest_test_helpers';
+import { createAssert, expectMatchingScreenshot, FONT_STACKS, generateTestID, TestOptions } from './vitest_test_helpers';
 
 // Helper function to create TabNote objects.
 const tabNote = (noteStruct: TabNoteStruct) => new TabNote(noteStruct);
 
 describe('Vibrato', () => {
   // Helper function to run a test with multiple backends and font stacks
-  function runTest(
+  async function runTest(
     testName: string,
-    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void | Promise<void>,
     backends: Array<{ backend: number; fontStacks: string[] }> = [
       { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
       { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
@@ -30,7 +30,7 @@ describe('Vibrato', () => {
   ) {
     backends.forEach(({ backend, fontStacks }) => {
       fontStacks.forEach((fontStackName) => {
-        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, async () => {
           const elementId = generateTestID('vibrato_test');
 
           // Create the DOM element before the test runs
@@ -39,7 +39,7 @@ describe('Vibrato', () => {
           element.id = elementId;
           document.body.appendChild(element);
 
-          const options: TestOptions = { elementId, params: {}, backend };
+          const options: TestOptions = { elementId, params: {}, backend, testName, fontStackName };
 
           // Set font stack
           const originalFontNames = Flow.getMusicFont();
@@ -48,7 +48,7 @@ describe('Vibrato', () => {
           try {
             const contextBuilder: ContextBuilder =
               backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
-            testFunc(options, contextBuilder);
+            await testFunc(options, contextBuilder);
           } finally {
             // Restore original font
             Flow.setMusicFont(...originalFontNames);
@@ -60,7 +60,7 @@ describe('Vibrato', () => {
     });
   }
 
-  runTest('Simple Vibrato', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Simple Vibrato', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const ctx = contextBuilder(options.elementId, 500, 240);
     ctx.scale(1.5, 1.5);
@@ -83,10 +83,11 @@ describe('Vibrato', () => {
     ];
 
     Formatter.FormatAndDraw(ctx, stave, notes);
+    await expectMatchingScreenshot(options, 'vibrato_tests.test.ts');
     assert.ok(true, 'Simple Vibrato');
   });
 
-  runTest('Harsh Vibrato', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Harsh Vibrato', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const ctx = contextBuilder(options.elementId, 500, 240);
     ctx.scale(1.5, 1.5);
@@ -109,10 +110,11 @@ describe('Vibrato', () => {
     ];
 
     Formatter.FormatAndDraw(ctx, stave, notes);
+    await expectMatchingScreenshot(options, 'vibrato_tests.test.ts');
     assert.ok(true, 'Harsh Vibrato');
   });
 
-  runTest('Vibrato with Bend', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Vibrato with Bend', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const ctx = contextBuilder(options.elementId, 500, 240);
     ctx.scale(1.3, 1.3);
@@ -144,6 +146,7 @@ describe('Vibrato', () => {
     ];
 
     Formatter.FormatAndDraw(ctx, stave, notes);
+    await expectMatchingScreenshot(options, 'vibrato_tests.test.ts');
     assert.ok(true, 'Vibrato with Bend');
   });
 });

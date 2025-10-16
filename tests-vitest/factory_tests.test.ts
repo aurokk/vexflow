@@ -9,13 +9,13 @@ import { Factory } from '../src/factory';
 import { Flow } from '../src/flow';
 import { Renderer } from '../src/renderer';
 import { Barline } from '../src/stavebarline';
-import { createAssert, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
+import { createAssert, expectMatchingScreenshot, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
 
 describe('Factory', () => {
   // Helper function to run a test with multiple backends and font stacks
-  function runTest(
+  async function runTest(
     testName: string,
-    testFunc: (options: TestOptions) => void,
+    testFunc: (options: TestOptions) => void | Promise<void>,
     backends: Array<{ backend: number; fontStacks: string[] }> = [
       { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
       { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
@@ -23,7 +23,7 @@ describe('Factory', () => {
   ) {
     backends.forEach(({ backend, fontStacks }) => {
       fontStacks.forEach((fontStackName) => {
-        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, async () => {
           const elementId = generateTestID('factory_test');
 
           // Create the DOM element before the test runs
@@ -32,14 +32,14 @@ describe('Factory', () => {
           element.id = elementId;
           document.body.appendChild(element);
 
-          const options: TestOptions = { elementId, params: {}, backend };
+          const options: TestOptions = { elementId, params: {}, backend, testName, fontStackName };
 
           // Set font stack
           const originalFontNames = Flow.getMusicFont();
           Flow.setMusicFont(...FONT_STACKS[fontStackName]);
 
           try {
-            testFunc(options);
+            await testFunc(options);
           } finally {
             // Restore original font
             Flow.setMusicFont(...originalFontNames);
@@ -73,17 +73,18 @@ describe('Factory', () => {
     assert.equal(factoryOptions.stave.space, 10);
   });
 
-  runTest('Draw', (options: TestOptions) => {
+  runTest('Draw', async (options: TestOptions) => {
     const assert = createAssert();
     const f = Factory.newFromElementId(options.elementId);
     f.Stave().setClef('treble');
     f.draw();
+    await expectMatchingScreenshot(options, 'factory_tests.test.ts');
     assert.ok(true);
   });
 
-  runTest('Draw Tab (repeat barlines must be aligned)', (options: TestOptions) => {
+  runTest('Draw Tab (repeat barlines must be aligned)', async (options: TestOptions) => {
     const assert = createAssert();
-    const factory = makeFactory(options.backend, options.elementId, 500, 400);
+    const factory = makeFactory(options.backend, options.elementId, 500, 400, options);
     const system = factory.System({ width: 500 });
     const stave = factory.Stave().setClef('treble').setKeySignature('C#').setBegBarType(Barline.type.REPEAT_BEGIN);
     const voices = [factory.Voice().addTickables([factory.GhostNote({ duration: 'w' })])];
@@ -94,6 +95,7 @@ describe('Factory', () => {
     system.addStave({ stave: tabStave, voices: tabVoices });
 
     factory.draw();
+    await expectMatchingScreenshot(options, 'factory_tests.test.ts');
     assert.equal(stave.getModifiers()[0].getX(), tabStave.getModifiers()[0].getX());
   });
 });

@@ -11,7 +11,14 @@ import { RenderContext } from '../src/rendercontext';
 import { ContextBuilder, Renderer } from '../src/renderer';
 import { StaveHairpin, StaveHairpinRenderOptions } from '../src/stavehairpin';
 import { StaveNote } from '../src/stavenote';
-import { createAssert, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
+import {
+  createAssert,
+  expectMatchingScreenshot,
+  FONT_STACKS,
+  generateTestID,
+  makeFactory,
+  TestOptions,
+} from './vitest_test_helpers';
 
 /**
  * Helper function to draw a single hairpin (either crescendo or decrescendo).
@@ -37,9 +44,9 @@ function drawHairpin(
 
 describe('StaveHairpin', () => {
   // Helper function to run a test with multiple backends and font stacks
-  function runTest(
+  async function runTest(
     testName: string,
-    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void | Promise<void>,
     backends: Array<{ backend: number; fontStacks: string[] }> = [
       { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
       { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
@@ -47,7 +54,7 @@ describe('StaveHairpin', () => {
   ) {
     backends.forEach(({ backend, fontStacks }) => {
       fontStacks.forEach((fontStackName) => {
-        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, async () => {
           const elementId = generateTestID('stavehairpin_test');
 
           // Create the DOM element before the test runs
@@ -57,7 +64,7 @@ describe('StaveHairpin', () => {
           document.body.appendChild(element);
 
           const assert = createAssert();
-          const options: TestOptions = { elementId, params: {}, backend };
+          const options: TestOptions = { elementId, params: {}, backend, testName, fontStackName };
 
           // Set font stack
           const originalFontNames = Flow.getMusicFont();
@@ -66,7 +73,7 @@ describe('StaveHairpin', () => {
           try {
             const contextBuilder: ContextBuilder =
               backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
-            testFunc(options, contextBuilder);
+            await testFunc(options, contextBuilder);
           } finally {
             // Restore original font
             Flow.setMusicFont(...originalFontNames);
@@ -78,9 +85,9 @@ describe('StaveHairpin', () => {
     });
   }
 
-  runTest('Simple StaveHairpin', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Simple StaveHairpin', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const factory = makeFactory(options.backend, options.elementId);
+    const factory = makeFactory(options.backend, options.elementId, 450, 140, options);
     const ctx = factory.getContext();
     const stave = factory.Stave();
 
@@ -102,12 +109,14 @@ describe('StaveHairpin', () => {
     drawHairpin(notes[0], notes[2], ctx, 1, 4);
     drawHairpin(notes[1], notes[3], ctx, 2, 3);
 
+    await expectMatchingScreenshot(options, 'stavehairpin_tests.test.ts');
+
     assert.ok(true, 'Simple Test');
   });
 
-  runTest('Horizontal Offset StaveHairpin', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Horizontal Offset StaveHairpin', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const factory = makeFactory(options.backend, options.elementId);
+    const factory = makeFactory(options.backend, options.elementId, 450, 140, options);
     const ctx = factory.getContext();
     const stave = factory.Stave();
 
@@ -143,12 +152,14 @@ describe('StaveHairpin', () => {
       right_shift_px: 120, // right horizontal offset
     });
 
+    await expectMatchingScreenshot(options, 'stavehairpin_tests.test.ts');
+
     assert.ok(true, 'Horizontal Offset Test');
   });
 
-  runTest('Vertical Offset StaveHairpin', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Vertical Offset StaveHairpin', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const factory = makeFactory(options.backend, options.elementId);
+    const factory = makeFactory(options.backend, options.elementId, 450, 140, options);
     const ctx = factory.getContext();
     const stave = factory.Stave();
 
@@ -180,12 +191,14 @@ describe('StaveHairpin', () => {
       right_shift_px: 0, // right horizontal offset
     });
 
+    await expectMatchingScreenshot(options, 'stavehairpin_tests.test.ts');
+
     assert.ok(true, 'Vertical Offset Test');
   });
 
-  runTest('Height StaveHairpin', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Height StaveHairpin', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
-    const factory = makeFactory(options.backend, options.elementId);
+    const factory = makeFactory(options.backend, options.elementId, 450, 140, options);
     const ctx = factory.getContext();
     const stave = factory.Stave();
 
@@ -216,6 +229,8 @@ describe('StaveHairpin', () => {
       left_shift_px: 2, // left horizontal offset
       right_shift_px: 0, // right horizontal offset
     });
+
+    await expectMatchingScreenshot(options, 'stavehairpin_tests.test.ts');
 
     assert.ok(true, 'Height Test');
   });

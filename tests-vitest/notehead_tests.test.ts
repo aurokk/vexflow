@@ -19,7 +19,7 @@ import { Stave } from '../src/stave';
 import { StaveNote, StaveNoteStruct } from '../src/stavenote';
 import { TickContext } from '../src/tickcontext';
 import { Voice } from '../src/voice';
-import { createAssert, FONT_STACKS, generateTestID, TestOptions } from './vitest_test_helpers';
+import { createAssert, expectMatchingScreenshot, FONT_STACKS, generateTestID, TestOptions } from './vitest_test_helpers';
 
 
 function setContextStyle(ctx: RenderContext): void {
@@ -43,9 +43,9 @@ function showNote(noteStruct: StaveNoteStruct, stave: Stave, ctx: RenderContext,
 
 describe('NoteHead', () => {
   // Helper function to run a test with multiple backends and font stacks
-  function runTest(
+  async function runTest(
     testName: string,
-    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void | Promise<void>,
     backends: Array<{ backend: number; fontStacks: string[] }> = [
       { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
       { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
@@ -53,7 +53,7 @@ describe('NoteHead', () => {
   ) {
     backends.forEach(({ backend, fontStacks }) => {
       fontStacks.forEach((fontStackName) => {
-        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, async () => {
           const elementId = generateTestID('notehead_test');
 
           // Create the DOM element before the test runs
@@ -62,8 +62,13 @@ describe('NoteHead', () => {
           element.id = elementId;
           document.body.appendChild(element);
 
-          const assert = createAssert();
-          const options: TestOptions = { elementId, params: {}, backend };
+          const options: TestOptions = {
+            elementId,
+            params: {},
+            backend,
+            testName,
+            fontStackName,
+          };
 
           // Set font stack
           const originalFontNames = Flow.getMusicFont();
@@ -72,7 +77,7 @@ describe('NoteHead', () => {
           try {
             const contextBuilder: ContextBuilder =
               backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
-            testFunc(options, contextBuilder);
+            await testFunc(options, contextBuilder);
           } finally {
             // Restore original font
             Flow.setMusicFont(...originalFontNames);
@@ -84,7 +89,7 @@ describe('NoteHead', () => {
     });
   }
 
-  runTest('Basic', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Basic', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const ctx = contextBuilder(options.elementId, 450, 250);
     setContextStyle(ctx);
@@ -104,10 +109,12 @@ describe('NoteHead', () => {
 
     voice.draw(ctx, stave);
 
+    await expectMatchingScreenshot(options, 'notehead_tests.test.ts');
+
     assert.ok('Basic NoteHead test');
   });
 
-  runTest('Various Heads', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Various Heads', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const notes: StaveNoteStruct[] = [
       { keys: ['g/5/d0'], duration: '4' },
@@ -154,9 +161,11 @@ describe('NoteHead', () => {
         assert.ok(staveNote.getYs().length > 0, 'Note ' + i + ' has Y values');
       }
     }
+
+    await expectMatchingScreenshot(options, 'notehead_tests.test.ts');
   });
 
-  runTest('Various Note Heads 1', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Various Note Heads 1', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const notes: StaveNoteStruct[] = [
       { keys: ['g/5/d'], duration: '1/2' },
@@ -224,9 +233,11 @@ describe('NoteHead', () => {
         assert.ok(staveNote.getYs().length > 0, 'Note ' + i + ' has Y values');
       }
     }
+
+    await expectMatchingScreenshot(options, 'notehead_tests.test.ts');
   });
 
-  runTest('Various Note Heads 2', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Various Note Heads 2', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const notes: StaveNoteStruct[] = [
       { keys: ['g/5/do'], duration: '4', auto_stem: true },
@@ -250,9 +261,11 @@ describe('NoteHead', () => {
       assert.ok(staveNote.getX() > 0, 'Note ' + i + ' has X value');
       assert.ok(staveNote.getYs().length > 0, 'Note ' + i + ' has Y values');
     }
+
+    await expectMatchingScreenshot(options, 'notehead_tests.test.ts');
   });
 
-  runTest('Drum Chord Heads', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Drum Chord Heads', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const notes: StaveNoteStruct[] = [
       { keys: ['a/4/d0', 'g/5/x3'], duration: '4' },
@@ -292,9 +305,11 @@ describe('NoteHead', () => {
         assert.ok(staveNote.getYs().length > 0, 'Note ' + i + ' has Y values');
       }
     }
+
+    await expectMatchingScreenshot(options, 'notehead_tests.test.ts');
   });
 
-  runTest('Bounding Boxes', (options: TestOptions, contextBuilder: ContextBuilder) => {
+  runTest('Bounding Boxes', async (options: TestOptions, contextBuilder: ContextBuilder) => {
     const assert = createAssert();
     const ctx = contextBuilder(options.elementId, 450, 250);
     setContextStyle(ctx);
@@ -319,6 +334,8 @@ describe('NoteHead', () => {
       ctx.rect(bb.getX(), bb.getY(), bb.getW(), bb.getH());
     }
     ctx.stroke();
+
+    await expectMatchingScreenshot(options, 'notehead_tests.test.ts');
 
     assert.ok('NoteHead Bounding Boxes');
   });

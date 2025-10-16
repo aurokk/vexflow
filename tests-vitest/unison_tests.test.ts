@@ -8,13 +8,13 @@ import { describe, test } from 'vitest';
 import { Flow } from '../src/flow';
 import { ContextBuilder, Renderer } from '../src/renderer';
 import { Tables } from '../src/tables';
-import { createAssert, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
+import { createAssert, expectMatchingScreenshot, FONT_STACKS, generateTestID, makeFactory, TestOptions } from './vitest_test_helpers';
 
 describe('Unison', () => {
   // Helper function to run a test with multiple backends and font stacks
   function runTest(
     testName: string,
-    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => void,
+    testFunc: (options: TestOptions, contextBuilder: ContextBuilder) => Promise<void>,
     backends: Array<{ backend: number; fontStacks: string[] }> = [
       { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
       { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
@@ -22,7 +22,7 @@ describe('Unison', () => {
   ) {
     backends.forEach(({ backend, fontStacks }) => {
       fontStacks.forEach((fontStackName) => {
-        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => {
+        test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, async () => {
           const elementId = generateTestID('unison_test');
 
           // Create the DOM element before the test runs
@@ -31,7 +31,7 @@ describe('Unison', () => {
           element.id = elementId;
           document.body.appendChild(element);
 
-          const options: TestOptions = { elementId, params: {}, backend };
+          const options: TestOptions = { elementId, params: {}, backend, testName, fontStackName };
 
           // Set font stack
           const originalFontNames = Flow.getMusicFont();
@@ -40,7 +40,7 @@ describe('Unison', () => {
           try {
             const contextBuilder: ContextBuilder =
               backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
-            testFunc(options, contextBuilder);
+            await testFunc(options, contextBuilder);
           } finally {
             // Restore original font
             Flow.setMusicFont(...originalFontNames);
@@ -53,10 +53,10 @@ describe('Unison', () => {
   }
 
   function simple(unison: boolean, voice1: string, voice2: string) {
-    return (options: TestOptions, contextBuilder: ContextBuilder) => {
+    return async (options: TestOptions, contextBuilder: ContextBuilder) => {
       const assert = createAssert();
       Tables.UNISON = unison;
-      const vf = makeFactory(options.backend, options.elementId, 500, 200);
+      const vf = makeFactory(options.backend, options.elementId, 500, 200, options);
       const score = vf.EasyScore();
 
       const system = vf.System({ y: 40, x: 10, width: 400 });
@@ -67,15 +67,16 @@ describe('Unison', () => {
       system.getStaves()[0].setClef('treble');
       system.getStaves()[0].setTimeSignature('4/4');
       vf.draw();
+      await expectMatchingScreenshot(options, 'unison_tests.test.ts');
       assert.ok(true);
     };
   }
 
   function style(unison: boolean) {
-    return (options: TestOptions, contextBuilder: ContextBuilder) => {
+    return async (options: TestOptions, contextBuilder: ContextBuilder) => {
       const assert = createAssert();
       Tables.UNISON = unison;
-      const vf = makeFactory(options.backend, options.elementId, 500, 200);
+      const vf = makeFactory(options.backend, options.elementId, 500, 200, options);
       const score = vf.EasyScore();
 
       const system = vf.System({ y: 40, x: 10, width: 400 });
@@ -90,15 +91,16 @@ describe('Unison', () => {
       system.getStaves()[0].setClef('treble');
       system.getStaves()[0].setTimeSignature('4/4');
       vf.draw();
+      await expectMatchingScreenshot(options, 'unison_tests.test.ts');
       assert.ok(true);
     };
   }
 
   function breve(unison: boolean) {
-    return (options: TestOptions, contextBuilder: ContextBuilder) => {
+    return async (options: TestOptions, contextBuilder: ContextBuilder) => {
       const assert = createAssert();
       Tables.UNISON = unison;
-      const vf = makeFactory(options.backend, options.elementId, 500, 200);
+      const vf = makeFactory(options.backend, options.elementId, 500, 200, options);
       const score = vf.EasyScore();
 
       const system = vf.System({ y: 40, x: 10, width: 400 });
@@ -112,6 +114,7 @@ describe('Unison', () => {
       system.getStaves()[0].setClef('treble');
       system.getStaves()[0].setTimeSignature('8/4');
       vf.draw();
+      await expectMatchingScreenshot(options, 'unison_tests.test.ts');
       assert.ok(true);
     };
   }
