@@ -372,6 +372,7 @@ export async function expectMatchingScreenshot(
     const canvas = document.getElementById(options.elementId) as HTMLCanvasElement;
     const width = canvas.width;
     const height = canvas.height;
+    console.log(width, height);
     const filepath = `tests-vitest/__screenshots__/${testFilename}/${options.testName} - Canvas - ${options.fontStackName}.png`;
 
     const newpng = captureCanvasScreenshot(canvas);
