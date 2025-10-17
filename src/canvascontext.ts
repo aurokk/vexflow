@@ -173,7 +173,6 @@ export class CanvasContext extends RenderContext {
     const canvas = this.context2D.canvas;
     const dpr: number = devicePixelRatio ?? globalObject().devicePixelRatio ?? 1;
     // eslint-disable-next-line no-console
-    console.log('dpr', dpr);
 
     // Scale the canvas size by the device pixel ratio clamping to the maximum supported size.
     [width, height] = CanvasContext.sanitizeCanvasDims(width * dpr, height * dpr);
