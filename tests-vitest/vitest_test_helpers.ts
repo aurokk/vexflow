@@ -370,9 +370,9 @@ export async function expectMatchingScreenshot(
 
   if (options.backend === Renderer.Backends.CANVAS) {
     const canvas = document.getElementById(options.elementId) as HTMLCanvasElement;
-    const width = canvas.width;
-    const height = canvas.height;
-    console.log(width, height);
+    const dpr = 2; // todo
+    const width = Math.round(canvas.clientWidth * dpr);
+    const height = Math.round(canvas.clientHeight * dpr);
     const filepath = `tests-vitest/__screenshots__/${testFilename}/${options.testName} - Canvas - ${options.fontStackName}.png`;
 
     const newpng = captureCanvasScreenshot(canvas);
@@ -393,7 +393,7 @@ export async function expectMatchingScreenshot(
     const svgHeight = parseFloat(svg.getAttribute('height') || '240');
 
     // Use scale from options if available, otherwise default to 2x for higher quality screenshots
-    const scale = options.scale ?? 2;
+    const scale = options.scale ?? 2; // todo
     const width = Math.round(svgWidth * scale);
     const height = Math.round(svgHeight * scale);
 
