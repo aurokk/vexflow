@@ -13,7 +13,7 @@ export default defineConfig({
           browser: 'chromium',
           headless: false,
           launch: {
-            args: ['--force-device-scale-factor=2'],
+            args: ['--high-dpi-support=1 --force-device-scale-factor=2'],
           },
         },
       ],
