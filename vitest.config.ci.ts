@@ -11,6 +11,9 @@ export default defineConfig({
         {
           browser: 'chromium',
           headless: true,
+          launch: {
+            args: ['--force-device-scale-factor=2'],
+          },
         },
       ],
     },
