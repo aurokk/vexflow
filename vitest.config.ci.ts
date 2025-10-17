@@ -11,7 +11,7 @@ export default defineConfig({
       instances: [
         {
           browser: 'chromium',
-          headless: false,
+          headless: true,
           launch: {
             args: ['--high-dpi-support=1 --force-device-scale-factor=2'],
           },
