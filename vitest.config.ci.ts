@@ -5,12 +5,13 @@ export default defineConfig({
   test: {
     // Use browser environment for real browser APIs
     browser: {
+      // ui: false,
       enabled: true,
       provider: 'playwright',
       instances: [
         {
           browser: 'chromium',
-          headless: true,
+          headless: false,
           launch: {
             args: ['--force-device-scale-factor=2'],
           },
