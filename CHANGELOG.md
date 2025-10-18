@@ -1,3 +1,10 @@
+# [1.2.0](https://github.com/aurokk/vexflow/compare/v1.1.0...v1.2.0) (2025-10-18)
+
+
+### Features
+
+* modernize test infrastructure ([#2](https://github.com/aurokk/vexflow/issues/2)) ([4f4d528](https://github.com/aurokk/vexflow/commit/4f4d528de4be1441e8bd68041403a9aec52d321a))
+
 # [1.1.0](https://github.com/aurokk/vexflow/compare/v1.0.3...v1.1.0) (2025-10-10)
 
 
