@@ -1,6 +1,6 @@
 name: main
 
-on: [push, pull_request]
+on: push
 
 permissions:
   contents: write
@@ -23,7 +23,8 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
       - run: npm install
-      - run: npm test
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:vitest:visual:ci
 
   release:
     runs-on: ubuntu-latest
