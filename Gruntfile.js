@@ -6,9 +6,6 @@ grunt
   - Build the complete set of VexFlow libraries (with source-maps) for production and debug use.
     This is the 'default' grunt task.
 
-grunt test
-  - Build the VexFlow debug libraries and run the QUnit command line tests with 'tests/flow-headless-browser.html'.
-
 grunt reference
   - Build VexFlow and copy the current build/ to the reference/ folder (the copy:reference task),
     so that we can compare future builds to the reference/ via `grunt test:reference`.
@@ -115,7 +112,6 @@ const VEX_LELAND = 'vexflow-leland';
 const VEX_PETALUMA = 'vexflow-petaluma';
 const VEX_CORE = 'vexflow-core'; // Supports dynamic import of the font modules below.
 const VEX_DEBUG = 'vexflow-debug';
-const VEX_DEBUG_TESTS = 'vexflow-debug-with-tests';
 
 const versionInfo = require('./tools/version_info');
 // Add a banner to the top of some CJS output files.
@@ -355,7 +351,7 @@ function webpackConfigs() {
   }
 
   function debugConfig(watch = false) {
-    return getConfig([VEX_DEBUG, VEX_DEBUG_TESTS], DEVELOPMENT_MODE, BANNER, 'Vex', watch);
+    return getConfig(VEX_DEBUG, DEVELOPMENT_MODE, BANNER, 'Vex', watch);
   }
 
   return {
@@ -379,19 +375,6 @@ module.exports = (grunt) => {
     pkg: grunt.file.readJSON('package.json'),
     webpack: webpackConfigs(),
 
-    // grunt qunit
-    // Run unit tests on the command line by loading tests/flow-headless-browser.html.
-    // Requires the CJS build to be present in the `build/cjs/` directory (See: grunt build:cjs).
-    // The grunt-contrib-qunit package uses puppeteer to load the test page.
-    qunit: {
-      files: ['tests/flow-headless-browser.html'],
-      options: {
-        puppeteer: {
-          headless: 'new',
-          args: ['--no-sandbox', '--disable-setuid-sandbox'],
-        },
-      },
-    },
     copy: {
       // grunt copy:reference
       // After `grunt test` call this to save the current build/ to reference/.
@@ -453,7 +436,6 @@ module.exports = (grunt) => {
 
   grunt.loadNpmTasks('grunt-contrib-clean');
   grunt.loadNpmTasks('grunt-contrib-copy');
-  grunt.loadNpmTasks('grunt-contrib-qunit');
   grunt.loadNpmTasks('grunt-webpack');
 
   // grunt
@@ -466,9 +448,8 @@ module.exports = (grunt) => {
     'build:docs',
   ]);
 
-  // grunt test
-  // Run command line qunit tests.
-  grunt.registerTask('test', 'Run command line unit tests.', ['clean:build', 'webpack:debug', 'qunit']);
+  // grunt test - No QUnit tests available. Use npm test for vitest.
+  grunt.registerTask('test', 'Build VexFlow debug libraries', ['clean:build', 'webpack:debug']);
 
   // grunt build:cjs
   grunt.registerTask('build:cjs', 'Use webpack to create CJS files in build/cjs/', 'webpack:prodAndDebug');
@@ -544,49 +525,6 @@ module.exports = (grunt) => {
     'clean:build',
     'build:esm:watch',
   ]);
-
-  // If you have already compiled the libraries, you can use the three `grunt test:xxx` tasks
-  // below to test the existing build:
-
-  // grunt test:cmd
-  grunt.registerTask('test:cmd', 'Run command line unit tests.', 'qunit');
-
-  // grunt test:browser:cjs
-  // Open the default browser to the flow.html test page.
-  grunt.registerTask(
-    'test:browser:cjs',
-    'Test the CJS build by loading the flow.html file in the default browser.',
-    () => {
-      // If the CJS build doesn't exist, build it.
-      if (!fs.existsSync(BUILD_CJS_DIR)) {
-        log('Building the CJS files.');
-        grunt.task.run('webpack:debug');
-      } else {
-        log('CJS files already exist. Skipping the build step. To rebuild, run:');
-        log('grunt clean:build && grunt test:browser:cjs');
-      }
-      open('./tests/flow.html');
-    }
-  );
-
-  // grunt test:browser:esm
-  // Starts a web server (e.g., `npx http-server`) and opens the default browser to
-  // http://localhost:8080/tests/flow.html?esm=true  The -c-1 option disables caching.
-  // Testing ES module code requires a web server.
-  grunt.registerTask(
-    'test:browser:esm',
-    'Test the ESM build in a web server by navigating to http://localhost:8080/tests/flow.html?esm=true',
-    function () {
-      log('Launching http-server...');
-      log('Building the ESM files in watch mode...');
-      grunt.task.run('clean:build_esm');
-      this.async(); // keep this grunt task alive.
-      concurrently([
-        { command: 'grunt build:esm:watch', name: 'watch:esm' },
-        { command: 'npx http-server -c-1 -o /tests/flow.html?esm=true', name: 'server' },
-      ]);
-    }
-  );
 
   // grunt reference
   // Build the current HEAD revision and copy it to reference/
