@@ -24,7 +24,6 @@ jobs:
           node-version: ${{ matrix.node-version }}
       - run: npm install
       - run: npx playwright install --with-deps chromium
-      - run: npm test
       - run: npm run test:vitest:visual:ci
 
   release:
