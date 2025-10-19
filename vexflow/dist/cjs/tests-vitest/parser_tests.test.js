@@ -1,0 +1,156 @@
+// [VexFlow](https://vexflow.com) - Copyright (c) Mohit Muthanna 2010.
+// MIT License
+//
+// Parser Tests - Vitest Version
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+import { afterAll, beforeAll, describe, test } from 'vitest';
+import { Flow } from '../src/flow';
+import { Parser } from '../src/parser';
+import { createAssert, FONT_STACKS } from './vitest_test_helpers';
+/**
+ * Grammar used in the first three test cases: basic, advanced, mixed.
+ */
+class TestGrammar {
+    // The begin() function is the only requirement when implementing the Grammar interface.
+    begin() {
+        return () => ({ expect: this.expect });
+    }
+    BIGORLITTLE() {
+        return { expect: [this.BIGLINE, this.LITTLELINE], or: true };
+    }
+    BIGLINE() {
+        return { expect: [this.LBRACE, this.WORD, this.WORDS, this.MAYBEEXCLAIM, this.RBRACE] };
+    }
+    LITTLELINE() {
+        return { expect: [this.WORD, this.WORDS] };
+    }
+    WORDS() {
+        return { expect: [this.COMMA, this.WORD], zeroOrMore: true };
+    }
+    MAYBEEXCLAIM() {
+        return { expect: [this.EXCLAIM], maybe: true };
+    }
+    LBRACE() {
+        return { token: '[{]' };
+    }
+    RBRACE() {
+        return { token: '[}]' };
+    }
+    WORD() {
+        return { token: '[a-zA-Z]+' };
+    }
+    COMMA() {
+        return { token: '[,]' };
+    }
+    EXCLAIM() {
+        return { token: '[!]' };
+    }
+    EOL() {
+        return { token: '$' };
+    }
+}
+/**
+ * Grammar used in the microscore test case.
+ * It represents a series of piano key numbers (Middle C == 40) separated by whitespace.
+ *   C Major Scale => 40 42 44 45 47 49 51 52
+ * A chord is 2 or more piano key numbers surrounded by BRACKETS and separated by PERIODS
+ *   C Major == [40.44.47]
+ *   C-major F-major G-major A-minor chord progression => [40.44.47] [45.49.52] [47.51.54] [49.52.56]
+ */
+class MicroScoreGrammar {
+    constructor() {
+        this.ITEM = () => ({ expect: [this.PIANO_KEY_NUMBER, this.CHORD], or: true });
+        this.MAYBE_MORE_ITEMS = () => ({ expect: [this.ITEM], zeroOrMore: true });
+        this.PIANO_KEY_NUMBER = () => ({ expect: [this.NUM], oneOrMore: true });
+        this.CHORD = () => ({ expect: [this.LEFT_BRACKET, this.PIANO_KEY_NUMBER, this.MORE_CHORD_PARTS, this.RIGHT_BRACKET] });
+        this.MORE_CHORD_PARTS = () => ({ expect: [this.PERIOD, this.PIANO_KEY_NUMBER], oneOrMore: true });
+        this.NUM = () => ({ token: '\\d+' });
+        this.WHITESPACE = () => ({ token: '\\s+' });
+        this.PERIOD = () => ({ token: '\\.' });
+        this.LEFT_BRACKET = () => ({ token: '\\[' });
+        this.RIGHT_BRACKET = () => ({ token: '\\]' });
+        this.EOL = () => ({ token: '$' });
+    }
+    begin() {
+        return () => ({ expect: [this.ITEM, this.MAYBE_MORE_ITEMS, this.EOL] });
+    }
+}
+/**
+ * Check that the result is a parse failure, and verify the error position.
+ */
+function fails(assert, result, expectedErrorPos, msg) {
+    assert.notEqual(result.success, true, msg);
+    assert.equal(result.errorPos, expectedErrorPos, msg);
+}
+describe('Parser', () => {
+    let originalFontNames;
+    beforeAll(() => __awaiter(void 0, void 0, void 0, function* () {
+        originalFontNames = Flow.getMusicFont();
+        Flow.setMusicFont(...FONT_STACKS['Bravura']);
+    }));
+    afterAll(() => {
+        Flow.setMusicFont(...originalFontNames);
+    });
+    test('Basic', () => {
+        const assert = createAssert();
+        const grammar = new TestGrammar();
+        grammar.expect = [grammar.LITTLELINE, grammar.EOL];
+        const parser = new Parser(grammar);
+        // Each of these strings will parse correctly.
+        const mustPass = ['first, second', 'first,second', 'first', 'first,second, third'];
+        mustPass.forEach((line) => assert.equal(parser.parse(line).success, true, line));
+        fails(assert, parser.parse(''), 0);
+        fails(assert, parser.parse('first second'), 6);
+        fails(assert, parser.parse('first,,'), 5);
+        fails(assert, parser.parse('first,'), 5);
+        fails(assert, parser.parse(',,'), 0);
+    });
+    test('Advanced', () => {
+        const assert = createAssert();
+        const grammar = new TestGrammar();
+        grammar.expect = [grammar.BIGLINE, grammar.EOL];
+        const parser = new Parser(grammar);
+        const mustPass = ['{first}', '{first!}', '{first,second}', '{first,second!}', '{first,second,third!}'];
+        mustPass.forEach((line) => assert.equal(parser.parse(line).success, true, line));
+        fails(assert, parser.parse('{first,second,third,}'), 19);
+        fails(assert, parser.parse('first,second,third'), 0);
+        fails(assert, parser.parse('{first,second,third'), 19);
+        fails(assert, parser.parse('{!}'), 1);
+    });
+    test('Mixed', () => {
+        const assert = createAssert();
+        const grammar = new TestGrammar();
+        grammar.expect = [grammar.BIGORLITTLE, grammar.EOL];
+        const parser = new Parser(grammar);
+        const mustPass = ['{first,second,third!}', 'first, second'];
+        mustPass.forEach((line) => assert.equal(parser.parse(line).success, true, line));
+        fails(assert, parser.parse('first second'), 6);
+    });
+    test('Micro Score', () => {
+        const assert = createAssert();
+        const grammar = new MicroScoreGrammar();
+        const parser = new Parser(grammar);
+        const mustPass = [
+            '40 42 44 45 47 49 51 52',
+            '[40.44.47] [45.49.52] [47.51.54] [49.52.56]',
+            '40 [40.44.47] 45 47 [44.47.51]', // Mixed Notes and Chords: C4 [Cmajor] F4 G4 [Eminor]
+        ];
+        mustPass.forEach((line) => {
+            var _a;
+            const result = parser.parse(line);
+            assert.equal(result.success, true, line);
+            assert.equal((_a = result.matches) === null || _a === void 0 ? void 0 : _a.length, 3, line);
+        });
+        fails(assert, parser.parse('40 42 44 45 47 49 5A 52'), 19);
+        fails(assert, parser.parse('40.44.47] [45.49.52] [47.51.54] [49.52.56]'), 2);
+        fails(assert, parser.parse('40 [40] 45 47 [44.47.51]'), 3); // A chord with a single note is not allowed.
+    });
+});

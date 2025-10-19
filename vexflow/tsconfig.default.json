@@ -1,0 +1,8 @@
+// build everything for development purposes
+{
+  "compilerOptions": {
+    "target": "es6",
+    "module": "esnext",
+    "outDir": "./dist/cjs"
+  }
+}

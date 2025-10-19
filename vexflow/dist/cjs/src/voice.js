@@ -1,0 +1,255 @@
+// [VexFlow](https://vexflow.com) - Copyright (c) Mohit Muthanna 2010.
+// MIT License
+import { Element } from './element';
+import { Fraction } from './fraction';
+import { Tables } from './tables';
+import { defined, RuntimeError, sumArray } from './util';
+export var VoiceMode;
+(function (VoiceMode) {
+    VoiceMode[VoiceMode["STRICT"] = 1] = "STRICT";
+    VoiceMode[VoiceMode["SOFT"] = 2] = "SOFT";
+    VoiceMode[VoiceMode["FULL"] = 3] = "FULL";
+})(VoiceMode || (VoiceMode = {}));
+/**
+ * `Voice` is mainly a container object to group `Tickables` for formatting.
+ */
+export class Voice extends Element {
+    static get CATEGORY() {
+        return "Voice" /* Category.Voice */;
+    }
+    /**
+     * Modes allow the addition of ticks in three different ways:
+     * - STRICT: This is the default. Ticks must fill the voice.
+     * - SOFT: Ticks can be added without restrictions.
+     * - FULL: Ticks do not need to fill the voice, but can't exceed the maximum tick length.
+     */
+    static get Mode() {
+        return VoiceMode;
+    }
+    constructor(time) {
+        super();
+        this.resolutionMultiplier = 1;
+        this.mode = VoiceMode.STRICT;
+        this.preFormatted = false;
+        this.ticksUsed = new Fraction(0, 1);
+        this.largestTickWidth = 0;
+        this.tickables = [];
+        this.options = {
+            softmaxFactor: Tables.SOFTMAX_FACTOR,
+        };
+        // Convert the `time` string into a VoiceTime object if necessary.
+        let voiceTime;
+        if (typeof time === 'string') {
+            // Time signature shortcut: "4/4", "3/8", etc.
+            const match = time.match(/(\d+)\/(\d+)/);
+            if (match) {
+                voiceTime = {
+                    num_beats: parseInt(match[1]),
+                    beat_value: parseInt(match[2]),
+                };
+            }
+        }
+        else {
+            voiceTime = time;
+        }
+        // Default time signature is 4/4.
+        this.time = Object.assign({ num_beats: 4, beat_value: 4, resolution: Tables.RESOLUTION }, voiceTime);
+        // Recalculate total ticks.
+        this.totalTicks = new Fraction(this.time.num_beats * (this.time.resolution / this.time.beat_value), 1);
+        // until tickables are added, the smallestTickCount is the same as the stated totalTicks duration.
+        this.smallestTickCount = this.totalTicks.clone();
+    }
+    /** Get the total ticks in the voice. */
+    getTotalTicks() {
+        return this.totalTicks;
+    }
+    /** Get the total ticks used in the voice by all the tickables. */
+    getTicksUsed() {
+        return this.ticksUsed;
+    }
+    /** Get the largest width of all the tickables. */
+    getLargestTickWidth() {
+        return this.largestTickWidth;
+    }
+    /** Get the tick count for the shortest tickable */
+    getSmallestTickCount() {
+        return this.smallestTickCount;
+    }
+    /** Get the tickables in the voice. */
+    getTickables() {
+        return this.tickables;
+    }
+    /** Get the voice mode (Voice.Mode.SOFT, STRICT, or FULL) */
+    getMode() {
+        return this.mode;
+    }
+    /**
+     * Set the voice mode.
+     * @param mode value from `VoiceMode` or Voice.Mode
+     */
+    setMode(mode) {
+        this.mode = mode;
+        return this;
+    }
+    /** Get the resolution multiplier for the voice. */
+    getResolutionMultiplier() {
+        return this.resolutionMultiplier;
+    }
+    /** Get the actual tick resolution for the voice. */
+    getActualResolution() {
+        return this.resolutionMultiplier * this.time.resolution;
+    }
+    /** Set the voice's stave. */
+    setStave(stave) {
+        this.stave = stave;
+        // Reset the bounding box so we can reformat.
+        this.boundingBox = undefined;
+        return this;
+    }
+    getStave() {
+        return this.stave;
+    }
+    /** Get the bounding box for the voice. */
+    getBoundingBox() {
+        if (!this.boundingBox) {
+            const stave = this.checkStave();
+            let boundingBox = undefined;
+            for (let i = 0; i < this.tickables.length; ++i) {
+                const tickable = this.tickables[i];
+                if (!tickable.getStave())
+                    tickable.setStave(stave);
+                const bb = tickable.getBoundingBox();
+                if (bb) {
+                    boundingBox = boundingBox ? boundingBox.mergeWith(bb) : bb;
+                }
+            }
+            this.boundingBox = boundingBox;
+        }
+        return this.boundingBox;
+    }
+    /** Set the voice mode to strict or soft. */
+    setStrict(strict) {
+        this.mode = strict ? VoiceMode.STRICT : VoiceMode.SOFT;
+        return this;
+    }
+    /** Determine if the voice is complete according to the voice mode. */
+    isComplete() {
+        if (this.mode === VoiceMode.STRICT || this.mode === VoiceMode.FULL) {
+            return this.ticksUsed.equals(this.totalTicks);
+        }
+        else {
+            return true;
+        }
+    }
+    /**
+     * We use softmax to layout the tickables proportional to the exponent of
+     * their duration. The softmax factor is used to determine the 'linearness' of
+     * the layout.
+     *
+     * The softmax of all the tickables in this voice should sum to 1.
+     */
+    setSoftmaxFactor(factor) {
+        this.options.softmaxFactor = factor;
+        this.expTicksUsed = 0; // reset
+        return this;
+    }
+    /**
+     * Calculate the sum of the exponents of all the ticks in this voice to use
+     * as the denominator of softmax.  (It is not the sum of the softmax(t) over all tickables)
+     *
+     * Note that the "exp" of "expTicksUsed" stands for "expontential" ticks used,
+     * not "expected" ticks used.
+     */
+    reCalculateExpTicksUsed() {
+        const totalTicks = this.ticksUsed.value();
+        const exp = (tickable) => Math.pow(this.options.softmaxFactor, tickable.getTicks().value() / totalTicks);
+        this.expTicksUsed = sumArray(this.tickables.map(exp));
+        return this.expTicksUsed;
+    }
+    /** Get the softmax-scaled value of a tick duration. 'tickValue' is a number. */
+    softmax(tickValue) {
+        if (!this.expTicksUsed) {
+            this.expTicksUsed = this.reCalculateExpTicksUsed();
+        }
+        const totalTicks = this.ticksUsed.value();
+        const exp = (v) => Math.pow(this.options.softmaxFactor, v / totalTicks);
+        const sm = exp(tickValue) / this.expTicksUsed;
+        return sm;
+    }
+    /** Add a tickable to the voice. */
+    addTickable(tickable) {
+        if (!tickable.shouldIgnoreTicks()) {
+            const ticks = tickable.getTicks();
+            // Update the total ticks for this line.
+            this.ticksUsed.add(ticks);
+            this.expTicksUsed = 0; // reset
+            if ((this.mode === VoiceMode.STRICT || this.mode === VoiceMode.FULL) &&
+                this.ticksUsed.greaterThan(this.totalTicks)) {
+                this.ticksUsed.subtract(ticks);
+                throw new RuntimeError('BadArgument', 'Too many ticks.');
+            }
+            // Track the smallest tickable for formatting.
+            if (ticks.lessThan(this.smallestTickCount)) {
+                this.smallestTickCount = ticks.clone();
+            }
+            this.resolutionMultiplier = this.ticksUsed.denominator;
+            // Expand total ticks using denominator from ticks used.
+            this.totalTicks.add(0, this.ticksUsed.denominator);
+        }
+        // Add the tickable to the line.
+        this.tickables.push(tickable);
+        tickable.setVoice(this);
+        return this;
+    }
+    /** Add an array of tickables to the voice. */
+    addTickables(tickables) {
+        for (let i = 0; i < tickables.length; ++i) {
+            this.addTickable(tickables[i]);
+        }
+        return this;
+    }
+    /** Preformat the voice by applying the voice's stave to each note. */
+    preFormat() {
+        if (this.preFormatted)
+            return this;
+        const stave = this.checkStave();
+        this.tickables.forEach((tickable) => {
+            if (!tickable.getStave()) {
+                tickable.setStave(stave);
+            }
+        });
+        this.preFormatted = true;
+        return this;
+    }
+    checkStave() {
+        return defined(this.stave, 'NoStave', 'No stave attached to instance.');
+    }
+    /**
+     * Render the voice onto the canvas `context` and an optional `stave`.
+     * If `stave` is omitted, it is expected that the notes have staves
+     * already set.
+     *
+     * This method also calculates the voice's boundingBox while drawing
+     * the notes. Note the similarities with this.getBoundingBox().
+     */
+    draw(context = this.checkContext(), stave) {
+        stave = stave !== null && stave !== void 0 ? stave : this.stave;
+        this.setRendered();
+        let boundingBox = undefined;
+        for (let i = 0; i < this.tickables.length; ++i) {
+            const tickable = this.tickables[i];
+            // Set the stave if provided.
+            if (stave) {
+                tickable.setStave(stave);
+            }
+            defined(tickable.getStave(), 'MissingStave', 'The voice cannot draw tickables without staves.');
+            const bb = tickable.getBoundingBox();
+            if (bb) {
+                boundingBox = boundingBox ? boundingBox.mergeWith(bb) : bb;
+            }
+            tickable.setContext(context);
+            tickable.drawWithStyle();
+        }
+        this.boundingBox = boundingBox;
+    }
+}

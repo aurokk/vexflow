@@ -1,0 +1,551 @@
+// [VexFlow](https://vexflow.com) - Copyright (c) Mohit Muthanna 2010.
+// MIT License
+//
+// GraceNote Tests - Vitest Version
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+// TODO: In the 'stem' test (aka Grace Note Stem › SVG + Petaluma in flow.html), the Petaluma note heads are not scaled down properly.
+import { describe, test } from 'vitest';
+import { Accidental } from '../src/accidental';
+import { Annotation } from '../src/annotation';
+import { Articulation } from '../src/articulation';
+import { Dot } from '../src/dot';
+import { Flow } from '../src/flow';
+import { Formatter } from '../src/formatter';
+import { Renderer } from '../src/renderer';
+import { createAssert, expectMatchingScreenshot, FONT_STACKS, generateTestID, makeFactory, } from './vitest_test_helpers';
+// Used in three tests below.
+const durationsForStemTest = ['8', '16', '32', '64', '128'];
+/**
+ * Helper function for three tests below: stem, stemWithBeamed, slash.
+ */
+const createNoteForStemTest = (duration, noteBuilder, keys, stem_direction, slash = false) => {
+    const struct = { duration, slash };
+    struct.stem_direction = stem_direction;
+    struct.keys = keys;
+    return noteBuilder(struct);
+};
+describe('Grace Notes', () => {
+    // Helper function to run a test with multiple backends and font stacks
+    function runTest(testName, testFunc, backends = [
+        { backend: Renderer.Backends.CANVAS, fontStacks: ['Bravura'] },
+        { backend: Renderer.Backends.SVG, fontStacks: ['Bravura', 'Gonville', 'Petaluma', 'Leland'] },
+    ]) {
+        return __awaiter(this, void 0, void 0, function* () {
+            backends.forEach(({ backend, fontStacks }) => {
+                fontStacks.forEach((fontStackName) => {
+                    test(`${testName} - ${backend === Renderer.Backends.SVG ? 'SVG' : 'Canvas'} - ${fontStackName}`, () => __awaiter(this, void 0, void 0, function* () {
+                        const elementId = generateTestID('gracenote_test');
+                        // Create the DOM element before the test runs
+                        const tagName = backend === Renderer.Backends.SVG ? 'div' : 'canvas';
+                        const element = document.createElement(tagName);
+                        element.id = elementId;
+                        document.body.appendChild(element);
+                        const assert = createAssert();
+                        const options = {
+                            elementId,
+                            params: {},
+                            backend,
+                            testName,
+                            fontStackName,
+                        };
+                        // Set font stack
+                        const originalFontNames = Flow.getMusicFont();
+                        Flow.setMusicFont(...FONT_STACKS[fontStackName]);
+                        try {
+                            const contextBuilder = backend === Renderer.Backends.SVG ? Renderer.getSVGContext : Renderer.getCanvasContext;
+                            yield testFunc(options, contextBuilder);
+                        }
+                        finally {
+                            // Restore original font
+                            Flow.setMusicFont(...originalFontNames);
+                            // Don't remove the element so we can see rendered output
+                            // element.remove();
+                        }
+                    }));
+                });
+            });
+        });
+    }
+    runTest('Grace Note Basic', (options, contextBuilder) => __awaiter(void 0, void 0, void 0, function* () {
+        const assert = createAssert();
+        const f = makeFactory(options.backend, options.elementId, 700, 130, options);
+        const stave = f.Stave({ x: 10, y: 10, width: 650 });
+        const gracenotes = [
+            { keys: ['e/4'], duration: '32' },
+            { keys: ['f/4'], duration: '32' },
+            { keys: ['g/4'], duration: '32' },
+            { keys: ['a/4'], duration: '32' },
+        ].map(f.GraceNote.bind(f));
+        const gracenotes1 = [{ keys: ['b/4'], duration: '8', slash: false }].map(f.GraceNote.bind(f));
+        const gracenotes2 = [{ keys: ['b/4'], duration: '8', slash: true }].map(f.GraceNote.bind(f));
+        const gracenotes3 = [
+            { keys: ['e/4'], duration: '8' },
+            { keys: ['f/4'], duration: '16' },
+            { keys: ['e/4', 'g/4'], duration: '8' },
+            { keys: ['a/4'], duration: '32' },
+            { keys: ['b/4'], duration: '32' },
+        ].map(f.GraceNote.bind(f));
+        const gracenotes4 = [
+            { keys: ['g/4'], duration: '8' },
+            { keys: ['g/4'], duration: '16' },
+            { keys: ['g/4'], duration: '16' },
+        ].map(f.GraceNote.bind(f));
+        gracenotes[1].addModifier(f.Accidental({ type: '##' }), 0);
+        gracenotes3[3].addModifier(f.Accidental({ type: 'bb' }), 0);
+        Dot.buildAndAttach([gracenotes4[0]], { all: true });
+        const notes = [
+            f
+                .StaveNote({ keys: ['b/4'], duration: '4', auto_stem: true })
+                .addModifier(f.GraceNoteGroup({ notes: gracenotes }).beamNotes(), 0),
+            f
+                .StaveNote({ keys: ['c/5'], duration: '4', auto_stem: true })
+                .addModifier(f.Accidental({ type: '#' }), 0)
+                .addModifier(f.GraceNoteGroup({ notes: gracenotes1 }).beamNotes(), 0),
+            f
+                .StaveNote({ keys: ['c/5', 'd/5'], duration: '4', auto_stem: true })
+                .addModifier(f.GraceNoteGroup({ notes: gracenotes2 }).beamNotes(), 0),
+            f
+                .StaveNote({ keys: ['a/4'], duration: '4', auto_stem: true })
+                .addModifier(f.GraceNoteGroup({ notes: gracenotes3 }).beamNotes(), 0),
+            f
+                .StaveNote({ keys: ['a/4'], duration: '4', auto_stem: true })
+                .addModifier(f.GraceNoteGroup({ notes: gracenotes4 }).beamNotes(), 0),
+        ];
+        const voice = f.Voice().setStrict(false).addTickables(notes);
+        new Formatter().joinVoices([voice]).formatToStave([voice], stave);
+        f.draw();
+        yield expectMatchingScreenshot(options, 'gracenote_tests.test.ts');
+        assert.ok(true, 'GraceNoteBasic');
+    }));
+    runTest('With Articulation and Annotation on Parent Note', (options, contextBuilder) => __awaiter(void 0, void 0, void 0, function* () {
+        const assert = createAssert();
+        const f = makeFactory(options.backend, options.elementId, 700, 130, options);
+        const stave = f.Stave({ x: 10, y: 10, width: 650 });
+        const gracenotes = [{ keys: ['b/4'], duration: '8', slash: false }].map(f.GraceNote.bind(f));
+        const notes = [
+            f
+                .StaveNote({ keys: ['c/5'], duration: '4', auto_stem: true })
+                .addModifier(f.GraceNoteGroup({ notes: gracenotes }), 0),
+            f
+                .StaveNote({ keys: ['c/5'], duration: '4', auto_stem: true })
+                .addModifier(f.GraceNoteGroup({ notes: gracenotes }), 0)
+                .addModifier(new Articulation('a-').setPosition(3), 0),
+            f
+                .StaveNote({ keys: ['c/5'], duration: '4', auto_stem: true })
+                .addModifier(f.GraceNoteGroup({ notes: gracenotes }), 0)
+                .addModifier(new Articulation('a-').setPosition(3), 0)
+                .addModifier(new Accidental('#')),
+            f
+                .StaveNote({ keys: ['c/5'], duration: '4', auto_stem: true })
+                .addModifier(f.GraceNoteGroup({ notes: gracenotes }), 0)
+                .addModifier(new Articulation('a-').setPosition(3), 0)
+                .addModifier(new Annotation('words')),
+            f
+                .StaveNote({ keys: ['c/5'], duration: '4', auto_stem: true })
+                .addModifier(f.GraceNoteGroup({ notes: gracenotes }), 0)
+                .addModifier(new Articulation('a-').setPosition(3), 0)
+                .addModifier(new Articulation('a>').setPosition(3), 0),
+            f
+                .StaveNote({ keys: ['c/5'], duration: '4', auto_stem: true })
+                .addModifier(f.GraceNoteGroup({ notes: gracenotes }), 0)
+                .addModifier(new Articulation('a-').setPosition(3), 0)
+                .addModifier(new Articulation('a>').setPosition(3), 0)
+                .addModifier(new Articulation('a@a').setPosition(3), 0),
+        ];
+        const voice = f.Voice().setStrict(false).addTickables(notes);
+        new Formatter().joinVoices([voice]).formatToStave([voice], stave);
+        f.draw();
+        yield expectMatchingScreenshot(options, 'gracenote_tests.test.ts');
+        assert.ok(true, 'GraceNoteModifiers');
+    }));
+    runTest('Grace Note Basic with Slurs', (options, contextBuilder) => __awaiter(void 0, void 0, void 0, function* () {
+        const assert = createAssert();
+        const f = makeFactory(options.backend, options.elementId, 700, 130, options);
+        const stave = f.Stave({ x: 10, y: 10, width: 650 });
+        const gracenotes0 = [
+            { keys: ['e/4'], duration: '32' },
+            { keys: ['f/4'], duration: '32' },
+            { keys: ['g/4'], duration: '32' },
+            { keys: ['a/4'], duration: '32' },
+        ].map(f.GraceNote.bind(f));
+        const gracenotes1 = [{ keys: ['b/4'], duration: '8', slash: false }].map(f.GraceNote.bind(f));
+        const gracenotes2 = [{ keys: ['b/4'], duration: '8', slash: true }].map(f.GraceNote.bind(f));
+        const gracenotes3 = [
+            { keys: ['e/4'], duration: '8' },
+            { keys: ['f/4'], duration: '16' },
+            { keys: ['e/4', 'g/4'], duration: '8' },
+            { keys: ['a/4'], duration: '32' },
+            { keys: ['b/4'], duration: '32' },
+        ].map(f.GraceNote.bind(f));
+        const gracenotes4 = [
+            { keys: ['a/4'], duration: '8' },
+            { keys: ['a/4'], duration: '16' },
+            { keys: ['a/4'], duration: '16' },
+        ].map(f.GraceNote.bind(f));
+        gracenotes0[1].addModifier(f.Accidental({ type: '#' }), 0);
+        gracenotes3[3].addModifier(f.Accidental({ type: 'b' }), 0);
+        gracenotes3[2].addModifier(f.Accidental({ type: 'n' }), 0);
+        Dot.buildAndAttach([gracenotes4[0]], { all: true });
+        const notes = [
+            f
+                .StaveNote({ keys: ['b/4'], duration: '4', auto_stem: true })
+                .addModifier(f.GraceNoteGroup({ notes: gracenotes0, slur: true }).beamNotes(), 0),
+            f
+                .StaveNote({ keys: ['c/5'], duration: '4', auto_stem: true })
+                .addModifier(f.Accidental({ type: '#' }), 0)
+                .addModifier(f.GraceNoteGroup({ notes: gracenotes1, slur: true }).beamNotes(), 0),
+            f
+                .StaveNote({ keys: ['c/5', 'd/5'], duration: '4', auto_stem: true })
+                .addModifier(f.GraceNoteGroup({ notes: gracenotes2, slur: true }).beamNotes(), 0),
+            f
+                .StaveNote({ keys: ['a/4'], duration: '4', auto_stem: true })
+                .addModifier(f.GraceNoteGroup({ notes: gracenotes3, slur: true }).beamNotes(), 0),
+            f
+                .StaveNote({ keys: ['a/4'], duration: '4', auto_stem: true })
+                .addModifier(f.GraceNoteGroup({ notes: gracenotes4, slur: true }).beamNotes(), 0),
+            f.StaveNote({ keys: ['a/4'], duration: '4', auto_stem: true }),
+        ];
+        const voice = f.Voice().setStrict(false).addTickables(notes);
+        new Formatter().joinVoices([voice]).formatToStave([voice], stave);
+        f.draw();
+        yield expectMatchingScreenshot(options, 'gracenote_tests.test.ts');
+        assert.ok(true, 'GraceNoteBasic');
+    }));
+    runTest('Grace Note Stem', (options, contextBuilder) => __awaiter(void 0, void 0, void 0, function* () {
+        const assert = createAssert();
+        const f = makeFactory(options.backend, options.elementId, 700, 130, options);
+        const stave = f.Stave({ x: 10, y: 10, width: 650 });
+        function createNotes(noteBuilder, keys, stem_direction) {
+            return durationsForStemTest.map((duration) => createNoteForStemTest(duration, noteBuilder, keys, stem_direction));
+        }
+        function createNoteBlock(keys, stem_direction) {
+            const staveNotes = createNotes(f.StaveNote.bind(f), keys, stem_direction);
+            const gracenotes = createNotes(f.GraceNote.bind(f), keys, stem_direction);
+            // Add a bunch of GraceNotes in front of the first StaveNote.
+            staveNotes[0].addModifier(f.GraceNoteGroup({ notes: gracenotes }), 0);
+            return staveNotes;
+        }
+        const voice = f.Voice().setStrict(false);
+        voice.addTickables(createNoteBlock(['g/4'], 1));
+        voice.addTickables(createNoteBlock(['d/5'], -1));
+        f.Formatter().joinVoices([voice]).formatToStave([voice], stave);
+        f.draw();
+        yield expectMatchingScreenshot(options, 'gracenote_tests.test.ts');
+        assert.ok(true, 'GraceNoteStem');
+    }));
+    runTest('Grace Note Stem with Beams 1', (options, contextBuilder) => __awaiter(void 0, void 0, void 0, function* () {
+        const assert = createAssert();
+        const keys1 = ['g/4'];
+        const stemDirection1 = 1;
+        const keys2 = ['d/5'];
+        const stemDirection2 = -1;
+        const f = makeFactory(options.backend, options.elementId, 700, 130, options);
+        const stave = f.Stave({ x: 10, y: 10, width: 650 });
+        function createBeamedNotes(noteBuilder, keys, stem_direction, beams, isGrace = false, notesToBeam) {
+            const ret = [];
+            durationsForStemTest.map((duration) => {
+                const n0 = createNoteForStemTest(duration, noteBuilder, keys, stem_direction);
+                const n1 = createNoteForStemTest(duration, noteBuilder, keys, stem_direction);
+                ret.push(n0);
+                ret.push(n1);
+                if (notesToBeam) {
+                    notesToBeam.push([n0, n1]);
+                }
+                if (!isGrace) {
+                    beams.push(f.Beam({ notes: [n0, n1] }));
+                }
+            });
+            return ret;
+        }
+        function createBeamedNoteBlock(keys, stem_direction, beams) {
+            const bnotes = createBeamedNotes(f.StaveNote.bind(f), keys, stem_direction, beams);
+            const notesToBeam = [];
+            const gracenotes = createBeamedNotes(f.GraceNote.bind(f), keys, stem_direction, beams, true, notesToBeam);
+            const graceNoteGroup = f.GraceNoteGroup({ notes: gracenotes });
+            notesToBeam.map(graceNoteGroup.beamNotes.bind(graceNoteGroup));
+            bnotes[0].addModifier(graceNoteGroup, 0);
+            return bnotes;
+        }
+        const beams = [];
+        const voice = f.Voice().setStrict(false);
+        voice.addTickables(createBeamedNoteBlock(keys1, stemDirection1, beams));
+        voice.addTickables(createBeamedNoteBlock(keys2, stemDirection2, beams));
+        f.Formatter().joinVoices([voice]).formatToStave([voice], stave);
+        f.draw();
+        yield expectMatchingScreenshot(options, 'gracenote_tests.test.ts');
+        assert.ok(true, 'GraceNoteStem');
+    }));
+    runTest('Grace Note Stem with Beams 2', (options, contextBuilder) => __awaiter(void 0, void 0, void 0, function* () {
+        const assert = createAssert();
+        const keys1 = ['a/3'];
+        const stemDirection1 = 1;
+        const keys2 = ['a/5'];
+        const stemDirection2 = -1;
+        const f = makeFactory(options.backend, options.elementId, 700, 130, options);
+        const stave = f.Stave({ x: 10, y: 10, width: 650 });
+        function createBeamedNotes(noteBuilder, keys, stem_direction, beams, isGrace = false, notesToBeam) {
+            const ret = [];
+            durationsForStemTest.map((duration) => {
+                const n0 = createNoteForStemTest(duration, noteBuilder, keys, stem_direction);
+                const n1 = createNoteForStemTest(duration, noteBuilder, keys, stem_direction);
+                ret.push(n0);
+                ret.push(n1);
+                if (notesToBeam) {
+                    notesToBeam.push([n0, n1]);
+                }
+                if (!isGrace) {
+                    beams.push(f.Beam({ notes: [n0, n1] }));
+                }
+            });
+            return ret;
+        }
+        function createBeamedNoteBlock(keys, stem_direction, beams) {
+            const bnotes = createBeamedNotes(f.StaveNote.bind(f), keys, stem_direction, beams);
+            const notesToBeam = [];
+            const gracenotes = createBeamedNotes(f.GraceNote.bind(f), keys, stem_direction, beams, true, notesToBeam);
+            const graceNoteGroup = f.GraceNoteGroup({ notes: gracenotes });
+            notesToBeam.map(graceNoteGroup.beamNotes.bind(graceNoteGroup));
+            bnotes[0].addModifier(graceNoteGroup, 0);
+            return bnotes;
+        }
+        const beams = [];
+        const voice = f.Voice().setStrict(false);
+        voice.addTickables(createBeamedNoteBlock(keys1, stemDirection1, beams));
+        voice.addTickables(createBeamedNoteBlock(keys2, stemDirection2, beams));
+        f.Formatter().joinVoices([voice]).formatToStave([voice], stave);
+        f.draw();
+        yield expectMatchingScreenshot(options, 'gracenote_tests.test.ts');
+        assert.ok(true, 'GraceNoteStem');
+    }));
+    runTest('Grace Note Stem with Beams 3', (options, contextBuilder) => __awaiter(void 0, void 0, void 0, function* () {
+        const assert = createAssert();
+        const keys1 = ['c/4'];
+        const stemDirection1 = 1;
+        const keys2 = ['c/6'];
+        const stemDirection2 = -1;
+        const f = makeFactory(options.backend, options.elementId, 700, 130, options);
+        const stave = f.Stave({ x: 10, y: 10, width: 650 });
+        function createBeamedNotes(noteBuilder, keys, stem_direction, beams, isGrace = false, notesToBeam) {
+            const ret = [];
+            durationsForStemTest.map((duration) => {
+                const n0 = createNoteForStemTest(duration, noteBuilder, keys, stem_direction);
+                const n1 = createNoteForStemTest(duration, noteBuilder, keys, stem_direction);
+                ret.push(n0);
+                ret.push(n1);
+                if (notesToBeam) {
+                    notesToBeam.push([n0, n1]);
+                }
+                if (!isGrace) {
+                    beams.push(f.Beam({ notes: [n0, n1] }));
+                }
+            });
+            return ret;
+        }
+        function createBeamedNoteBlock(keys, stem_direction, beams) {
+            const bnotes = createBeamedNotes(f.StaveNote.bind(f), keys, stem_direction, beams);
+            const notesToBeam = [];
+            const gracenotes = createBeamedNotes(f.GraceNote.bind(f), keys, stem_direction, beams, true, notesToBeam);
+            const graceNoteGroup = f.GraceNoteGroup({ notes: gracenotes });
+            notesToBeam.map(graceNoteGroup.beamNotes.bind(graceNoteGroup));
+            bnotes[0].addModifier(graceNoteGroup, 0);
+            return bnotes;
+        }
+        const beams = [];
+        const voice = f.Voice().setStrict(false);
+        voice.addTickables(createBeamedNoteBlock(keys1, stemDirection1, beams));
+        voice.addTickables(createBeamedNoteBlock(keys2, stemDirection2, beams));
+        f.Formatter().joinVoices([voice]).formatToStave([voice], stave);
+        f.draw();
+        yield expectMatchingScreenshot(options, 'gracenote_tests.test.ts');
+        assert.ok(true, 'GraceNoteStem');
+    }));
+    runTest('Grace Note Slash', (options, contextBuilder) => __awaiter(void 0, void 0, void 0, function* () {
+        const assert = createAssert();
+        const f = makeFactory(options.backend, options.elementId, 700, 130, options);
+        const stave = f.Stave({ x: 10, y: 10, width: 650 });
+        function createNotes(noteT, keys, stem_direction, slash) {
+            return durationsForStemTest.map((d) => createNoteForStemTest(d, noteT, keys, stem_direction, slash));
+        }
+        function createNoteBlock(keys, stem_direction) {
+            const notes = [f.StaveNote({ keys: ['f/4'], stem_direction, duration: '16' })];
+            let graceNotes = createNotes(f.GraceNote.bind(f), keys, stem_direction, true);
+            const duration = '8';
+            const gns = [
+                { keys: ['d/4', 'a/4'], stem_direction, duration, slash: true },
+                { keys: ['d/4', 'a/4'], stem_direction, duration, slash: true },
+                { keys: ['d/4', 'a/4'], stem_direction, duration, slash: true },
+                { keys: ['e/4', 'a/4'], stem_direction, duration, slash: true },
+                { keys: ['e/4', 'a/4'], stem_direction, duration, slash: true },
+                { keys: ['b/4', 'f/5'], stem_direction, duration, slash: true },
+                { keys: ['b/4', 'f/5'], stem_direction, duration, slash: true },
+                { keys: ['b/4', 'f/5'], stem_direction, duration, slash: true },
+                { keys: ['e/4', 'a/4'], stem_direction, duration, slash: true },
+            ].map(f.GraceNote.bind(f));
+            const notesToBeam = [];
+            notesToBeam.push([gns[0], gns[1], gns[2]]);
+            notesToBeam.push([gns[3], gns[4], gns[5]]);
+            notesToBeam.push([gns[6], gns[7], gns[8]]);
+            // Merge the two GraceNote[].
+            graceNotes = graceNotes.concat(gns);
+            const graceNoteGroup = f.GraceNoteGroup({ notes: graceNotes });
+            notesToBeam.forEach((notes) => graceNoteGroup.beamNotes(notes));
+            notes[0].addModifier(graceNoteGroup, 0);
+            return notes;
+        }
+        const voice = f.Voice().setStrict(false);
+        voice.addTickables(createNoteBlock(['d/4', 'a/4'], 1));
+        voice.addTickables(createNoteBlock(['d/4', 'a/4'], -1));
+        f.Formatter().joinVoices([voice]).formatToStave([voice], stave);
+        f.draw();
+        yield expectMatchingScreenshot(options, 'gracenote_tests.test.ts');
+        assert.ok(true, 'GraceNoteSlash');
+    }));
+    runTest('Grace Note Slash with Beams', (options, contextBuilder) => __awaiter(void 0, void 0, void 0, function* () {
+        const assert = createAssert();
+        const f = makeFactory(options.backend, options.elementId, 800, 130, options);
+        const stave = f.Stave({ x: 10, y: 10, width: 750 });
+        function createNoteBlock(keys, stem_direction) {
+            const notes = [f.StaveNote({ keys: ['f/4'], stem_direction, duration: '16' })];
+            let allGraceNotes = [];
+            const graceNotesToBeam = [];
+            ['8', '16', '32', '64'].forEach(function (duration) {
+                const graceNotes = [
+                    { keys: ['d/4', 'a/4'], stem_direction, duration, slash: true },
+                    { keys: ['d/4', 'a/4'], stem_direction, duration, slash: false },
+                    { keys: ['e/4', 'a/4'], stem_direction, duration, slash: true },
+                    { keys: ['b/4', 'f/5'], stem_direction, duration, slash: false },
+                    { keys: ['b/4', 'f/5'], stem_direction, duration, slash: true },
+                    { keys: ['e/4', 'a/4'], stem_direction, duration, slash: false },
+                ].map(f.GraceNote.bind(f));
+                graceNotesToBeam.push([graceNotes[0], graceNotes[1]]);
+                graceNotesToBeam.push([graceNotes[2], graceNotes[3]]);
+                graceNotesToBeam.push([graceNotes[4], graceNotes[5]]);
+                allGraceNotes = allGraceNotes.concat(graceNotes);
+            });
+            const graceNoteGroup = f.GraceNoteGroup({ notes: allGraceNotes });
+            graceNotesToBeam.forEach((g) => graceNoteGroup.beamNotes(g));
+            notes[0].addModifier(graceNoteGroup, 0);
+            return notes;
+        }
+        const voice = f.Voice().setStrict(false);
+        voice.addTickables(createNoteBlock(['d/4', 'a/4'], 1));
+        voice.addTickables(createNoteBlock(['d/4', 'a/4'], -1));
+        f.Formatter().joinVoices([voice]).formatToStave([voice], stave);
+        f.draw();
+        yield expectMatchingScreenshot(options, 'gracenote_tests.test.ts');
+        assert.ok(true, 'GraceNoteSlashWithBeams');
+    }));
+    runTest('Grace Notes Multiple Voices', (options, contextBuilder) => __awaiter(void 0, void 0, void 0, function* () {
+        const assert = createAssert();
+        const f = makeFactory(options.backend, options.elementId, 450, 140, options);
+        const stave = f.Stave({ x: 10, y: 10, width: 450 });
+        const notes = [
+            { keys: ['f/5'], stem_direction: 1, duration: '16' },
+            { keys: ['f/5'], stem_direction: 1, duration: '16' },
+            { keys: ['d/5'], stem_direction: 1, duration: '16' },
+            { keys: ['c/5'], stem_direction: 1, duration: '16' },
+            { keys: ['c/5'], stem_direction: 1, duration: '16' },
+            { keys: ['d/5'], stem_direction: 1, duration: '16' },
+            { keys: ['f/5'], stem_direction: 1, duration: '16' },
+            { keys: ['e/5'], stem_direction: 1, duration: '16' },
+        ].map(f.StaveNote.bind(f));
+        const notes2 = [
+            { keys: ['f/4'], stem_direction: -1, duration: '16' },
+            { keys: ['e/4'], stem_direction: -1, duration: '16' },
+            { keys: ['d/4'], stem_direction: -1, duration: '16' },
+            { keys: ['c/4'], stem_direction: -1, duration: '16' },
+            { keys: ['c/4'], stem_direction: -1, duration: '16' },
+            { keys: ['d/4'], stem_direction: -1, duration: '16' },
+            { keys: ['f/4'], stem_direction: -1, duration: '16' },
+            { keys: ['e/4'], stem_direction: -1, duration: '16' },
+        ].map(f.StaveNote.bind(f));
+        const gracenotes1 = [{ keys: ['b/4'], stem_direction: 1, duration: '8', slash: true }].map(f.GraceNote.bind(f));
+        const gracenotes2 = [{ keys: ['f/4'], stem_direction: -1, duration: '8', slash: true }].map(f.GraceNote.bind(f));
+        const gracenotes3 = [
+            { keys: ['f/4'], duration: '32', stem_direction: -1 },
+            { keys: ['e/4'], duration: '32', stem_direction: -1 },
+        ].map(f.GraceNote.bind(f));
+        const gracenotes4 = [
+            { keys: ['f/5'], duration: '32', stem_direction: 1 },
+            { keys: ['e/5'], duration: '32', stem_direction: 1 },
+            { keys: ['e/5'], duration: '8', stem_direction: 1 },
+        ].map(f.GraceNote.bind(f));
+        gracenotes2[0].setStemDirection(-1);
+        gracenotes2[0].addModifier(f.Accidental({ type: '#' }), 0);
+        notes[1].addModifier(f.GraceNoteGroup({ notes: gracenotes4 }).beamNotes(), 0);
+        notes[3].addModifier(f.GraceNoteGroup({ notes: gracenotes1 }), 0);
+        notes2[1].addModifier(f.GraceNoteGroup({ notes: gracenotes2 }).beamNotes(), 0);
+        notes2[5].addModifier(f.GraceNoteGroup({ notes: gracenotes3 }).beamNotes(), 0);
+        const voice = f.Voice().setStrict(false).addTickables(notes);
+        const voice2 = f.Voice().setStrict(false).addTickables(notes2);
+        f.Beam({ notes: notes.slice(0, 4) });
+        f.Beam({ notes: notes.slice(4, 8) });
+        f.Beam({ notes: notes2.slice(0, 4) });
+        f.Beam({ notes: notes2.slice(4, 8) });
+        f.Formatter().joinVoices([voice, voice2]).formatToStave([voice, voice2], stave);
+        f.draw();
+        yield expectMatchingScreenshot(options, 'gracenote_tests.test.ts');
+        assert.ok(true, 'Sixteenth Test');
+    }));
+    runTest('Grace Notes Multiple Voices Multiple Draws', (options, contextBuilder) => __awaiter(void 0, void 0, void 0, function* () {
+        const assert = createAssert();
+        const f = makeFactory(options.backend, options.elementId, 450, 140, options);
+        const stave = f.Stave({ x: 10, y: 10, width: 450 });
+        const notes = [
+            { keys: ['f/5'], stem_direction: 1, duration: '16' },
+            { keys: ['f/5'], stem_direction: 1, duration: '16' },
+            { keys: ['d/5'], stem_direction: 1, duration: '16' },
+            { keys: ['c/5'], stem_direction: 1, duration: '16' },
+            { keys: ['c/5'], stem_direction: 1, duration: '16' },
+            { keys: ['d/5'], stem_direction: 1, duration: '16' },
+            { keys: ['f/5'], stem_direction: 1, duration: '16' },
+            { keys: ['e/5'], stem_direction: 1, duration: '16' },
+        ].map(f.StaveNote.bind(f));
+        const notes2 = [
+            { keys: ['f/4'], stem_direction: -1, duration: '16' },
+            { keys: ['e/4'], stem_direction: -1, duration: '16' },
+            { keys: ['d/4'], stem_direction: -1, duration: '16' },
+            { keys: ['c/4'], stem_direction: -1, duration: '16' },
+            { keys: ['c/4'], stem_direction: -1, duration: '16' },
+            { keys: ['d/4'], stem_direction: -1, duration: '16' },
+            { keys: ['f/4'], stem_direction: -1, duration: '16' },
+            { keys: ['e/4'], stem_direction: -1, duration: '16' },
+        ].map(f.StaveNote.bind(f));
+        const gracenotes1 = [{ keys: ['b/4'], stem_direction: 1, duration: '8', slash: true }].map(f.GraceNote.bind(f));
+        const gracenotes2 = [{ keys: ['f/4'], stem_direction: -1, duration: '8', slash: true }].map(f.GraceNote.bind(f));
+        const gracenotes3 = [
+            { keys: ['f/4'], duration: '32', stem_direction: -1 },
+            { keys: ['e/4'], duration: '32', stem_direction: -1 },
+        ].map(f.GraceNote.bind(f));
+        const gracenotes4 = [
+            { keys: ['f/5'], duration: '32', stem_direction: 1 },
+            { keys: ['e/5'], duration: '32', stem_direction: 1 },
+            { keys: ['e/5'], duration: '8', stem_direction: 1 },
+        ].map(f.GraceNote.bind(f));
+        gracenotes2[0].setStemDirection(-1);
+        gracenotes2[0].addModifier(f.Accidental({ type: '#' }), 0);
+        notes[1].addModifier(f.GraceNoteGroup({ notes: gracenotes4 }).beamNotes(), 0);
+        notes[3].addModifier(f.GraceNoteGroup({ notes: gracenotes1 }), 0);
+        notes2[1].addModifier(f.GraceNoteGroup({ notes: gracenotes2 }).beamNotes(), 0);
+        notes2[5].addModifier(f.GraceNoteGroup({ notes: gracenotes3 }).beamNotes(), 0);
+        const voice = f.Voice().setStrict(false).addTickables(notes);
+        const voice2 = f.Voice().setStrict(false).addTickables(notes2);
+        f.Beam({ notes: notes.slice(0, 4) });
+        f.Beam({ notes: notes.slice(4, 8) });
+        f.Beam({ notes: notes2.slice(0, 4) });
+        f.Beam({ notes: notes2.slice(4, 8) });
+        f.Formatter().joinVoices([voice, voice2]).formatToStave([voice, voice2], stave);
+        f.draw();
+        f.draw();
+        yield expectMatchingScreenshot(options, 'gracenote_tests.test.ts');
+        assert.ok(true, 'Seventeenth Test');
+    }));
+});
