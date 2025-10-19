@@ -1,0 +1,4 @@
+// build everything for development purposes
+{
+  "outDir": "./dist/cjs"
+}
