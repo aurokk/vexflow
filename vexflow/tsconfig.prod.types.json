@@ -2,6 +2,7 @@
   "compilerOptions": {
     "declaration": true,
     "emitDeclarationOnly": true,
+    "forceConsistentCasingInFileNames": true,
     "module": "esnext",
     "moduleResolution": "node",
     "outDir": "./dist/types",

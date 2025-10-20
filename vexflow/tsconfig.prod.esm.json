@@ -1,6 +1,7 @@
 {
   "compilerOptions": {
     "declaration": false,
+    "forceConsistentCasingInFileNames": true,
     "module": "esnext",
     "moduleResolution": "node",
     "outDir": "./dist/esm",
