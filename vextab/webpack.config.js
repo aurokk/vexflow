@@ -74,13 +74,7 @@ module.exports = (env) => {
         },
         {
           test: /\.jsx?$/,
-          exclude: (modulePath) => {
-            // Exclude node_modules
-            if (/node_modules/.test(modulePath)) return true;
-            // Exclude local vexflow dist files
-            if (/vexflow[\/\\]dist/.test(modulePath)) return true;
-            return false;
-          },
+          exclude: /node_modules/,
           use: [
             { loader: "babel-loader" },
             { loader: "eslint-loader", options: { fix: true } },
@@ -93,7 +87,10 @@ module.exports = (env) => {
     resolve: {
       extensions: [".tsx", ".ts", ".js", ".jsx", ".jison"],
       alias: {
-        "@aurokk/vexflow": path.resolve(__dirname, "../vexflow/dist/cjs/entry/vexflow.js"),
+        "@aurokk/vexflow": path.resolve(
+          __dirname,
+          "../vexflow/dist/cjs/entry/vexflow.js"
+        ),
       },
     },
   };
