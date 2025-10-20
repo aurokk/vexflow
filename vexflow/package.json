@@ -1,22 +1,8 @@
 {
-  "name": "@aurokk/vexflow",
-  "version": "1.2.0",
-  "description": "A JavaScript library for rendering music notation and guitar tablature.",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/aurokk/vexflow.git"
-  },
   "author": {
     "name": "Dmitrii Kochnev",
     "email": "aurokkez@gmail.com"
   },
-  "license": "MIT",
-  "files": [
-    "build",
-    "dist",
-    "entry",
-    "src"
-  ],
   "bugs": {
     "url": "https://github.com/aurokk/vexflow/issues"
   },
@@ -77,6 +63,29 @@
     "vitest": "^3.2.4",
     "webpack": "^5.102.1"
   },
+  "description": "A JavaScript library for rendering music notation and guitar tablature.",
+  "files": [
+    "build",
+    "dist",
+    "entry",
+    "src"
+  ],
+  "keywords": [
+    "music",
+    "notation",
+    "piano",
+    "guitar",
+    "tablature"
+  ],
+  "license": "MIT",
+  "name": "@aurokk/vexflow",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aurokk/vexflow.git"
+  },
   "scripts": {
     "build:dev:run": "npm-run-all build:dev:run:*",
     "build:dev:run:esm": "tsc --project tsconfig.dev.esm.json",
@@ -96,14 +105,5 @@
     "test:dev:watch": "vitest --ui --config vitest.config.dev.ts",
     "test:dev:watch:visual": "VEXFLOW_VISUAL_REGRESSION=1 vitest --ui --config vitest.config.dev.ts"
   },
-  "keywords": [
-    "music",
-    "notation",
-    "piano",
-    "guitar",
-    "tablature"
-  ],
-  "publishConfig": {
-    "access": "public"
-  }
+  "version": "1.2.0"
 }
