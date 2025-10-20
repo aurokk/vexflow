@@ -78,7 +78,7 @@ module.exports = (env) => {
             // Exclude node_modules
             if (/node_modules/.test(modulePath)) return true;
             // Exclude local vexflow dist files
-            if (/vexflow[\/\\]dist/.test(modulePath)) return true;
+            if (/vexflow/.test(modulePath)) return true;
             return false;
           },
           use: [
@@ -92,9 +92,6 @@ module.exports = (env) => {
     },
     resolve: {
       extensions: [".tsx", ".ts", ".js", ".jsx", ".jison"],
-      alias: {
-        "@aurokk/vexflow": path.resolve(__dirname, "../vexflow/dist/cjs/entry/vexflow.js"),
-      },
       fallback: {
         fs: false,
         path: false,
