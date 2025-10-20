@@ -51,6 +51,8 @@
   ],
   "license": "MIT",
   "name": "@aurokk/vextab",
+  "main": "dist/main.dev.js",
+  "types": "dist/src/main.d.ts",
   "publishConfig": {
     "access": "public"
   },

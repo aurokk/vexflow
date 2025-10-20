@@ -25,11 +25,6 @@ const config: webpack.Configuration = {
       filename: "index.html",
       chunks: ["tests"],
     }),
-    new HtmlWebpackPlugin({
-      template: "./tests/playground.html",
-      filename: "playground.html",
-      chunks: ["playground"],
-    }),
     new CopyPlugin({
       patterns: [
         {
@@ -50,7 +45,6 @@ const config: webpack.Configuration = {
     main: "./src/main.ts",
     div: "./src/div.ts",
     tests: "./tests/tests.ts",
-    playground: "./tests/playground.ts",
   },
   output: {
     library: "vextab",

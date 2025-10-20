@@ -15,10 +15,8 @@
     "noImplicitAny": false,
     "noImplicitThis": false,
     "strictNullChecks": false,
-    "declaration": true,
-    "declarationMap": true,
     "outDir": "./dist"
   },
-  "include": ["src/**/*", "tests/**/*"],
-  "exclude": ["node_modules", "dist", "releases", "tests/playground.ts", "tests/playground.html"]
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
 }
