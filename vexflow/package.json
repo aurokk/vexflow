@@ -13,11 +13,9 @@
   "license": "MIT",
   "files": [
     "build",
-    "src",
+    "dist",
     "entry",
-    "releases/vexflow-min.js",
-    "releases/vexflow-debug.js",
-    "AUTHORS.md"
+    "src"
   ],
   "bugs": {
     "url": "https://github.com/aurokk/vexflow/issues"
@@ -54,6 +52,7 @@
     "jsdom": "^27.0.0",
     "jspdf": "^2.5.1",
     "npm": "^11.6.2",
+    "npm-run-all": "^4.1.5",
     "opener": "^1.5.2",
     "opentype.js": "^1.3.4",
     "pixelmatch": "^7.1.0",
@@ -79,20 +78,23 @@
     "webpack": "^5.102.1"
   },
   "scripts": {
-    "build": "tsc --project tsconfig.default.json",
-    "build:watch": "tsc --project tsconfig.default.json --watch",
-    "start": "grunt",
-    "test": "vitest run --config vitest.config.ci.ts",
-    "test:vitest": "vitest run --config vitest.config.dev.ts",
-    "test:vitest:ci": "vitest run --config vitest.config.ci.ts",
-    "test:vitest:ui": "vitest run --ui --config vitest.config.dev.ts",
-    "test:vitest:watch": "vitest --config vitest.config.dev.ts",
-    "test:vitest:visual": "VEXFLOW_VISUAL_REGRESSION=1 vitest run --config vitest.config.dev.ts",
-    "test:vitest:visual:ci": "VEXFLOW_VISUAL_REGRESSION=1 vitest run --config vitest.config.ci.ts",
-    "test:vitest:visual:watch": "VEXFLOW_VISUAL_REGRESSION=1 vitest --config vitest.config.dev.ts",
-    "test:vitest:clean": "rm -rf tests/__screenshots__",
-    "clean:build": "grunt clean:build",
-    "webpack:watchDebug": "grunt webpack:watchDebug"
+    "build:dev:run": "npm-run-all build:dev:run:*",
+    "build:dev:run:esm": "tsc --project tsconfig.dev.esm.json",
+    "build:dev:run:cjs": "tsc --project tsconfig.dev.cjs.json",
+    "build:dev:run:types": "tsc --project tsconfig.dev.types.json",
+    "build:dev:watch": "npm-run-all build:dev:watch:*",
+    "build:dev:watch:esm": "tsc --project tsconfig.dev.esm.json --watch",
+    "build:dev:watch:cjs": "tsc --project tsconfig.dev.cjs.json --watch",
+    "build:dev:watch:types": "tsc --project tsconfig.dev.types.json --watch",
+    "build:prod:run": "npm-run-all build:prod:run:*",
+    "build:prod:run:esm": "tsc --project tsconfig.prod.esm.json",
+    "build:prod:run:cjs": "tsc --project tsconfig.prod.cjs.json",
+    "build:prod:run:types": "tsc --project tsconfig.prod.types.json",
+    "test:ci:run": "VEXFLOW_VISUAL_REGRESSION=1 vitest run --config vitest.config.ci.ts",
+    "test:dev:run": "vitest run --ui --config vitest.config.dev.ts",
+    "test:dev:run:visual": "VEXFLOW_VISUAL_REGRESSION=1 vitest run --ui --config vitest.config.dev.ts",
+    "test:dev:watch": "vitest --ui --config vitest.config.dev.ts",
+    "test:dev:watch:visual": "VEXFLOW_VISUAL_REGRESSION=1 vitest --ui --config vitest.config.dev.ts"
   },
   "keywords": [
     "music",
