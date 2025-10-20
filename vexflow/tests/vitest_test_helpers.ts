@@ -372,7 +372,7 @@ export async function expectMatchingScreenshot(
     const canvas = document.getElementById(options.elementId) as HTMLCanvasElement;
     const width = canvas.width;
     const height = canvas.height;
-    const filepath = `tests-vitest/__screenshots__/${testFilename}/${options.testName} - Canvas - ${options.fontStackName}.png`;
+    const filepath = `tests/__screenshots__/${testFilename}/${options.testName} - Canvas - ${options.fontStackName}.png`;
 
     const newpng = captureCanvasScreenshot(canvas);
     const oldpng = await readOrSaveScreenshot(newpng, { filepath, width, height });
@@ -396,7 +396,7 @@ export async function expectMatchingScreenshot(
     const width = Math.round(svgWidth * scale);
     const height = Math.round(svgHeight * scale);
 
-    const filepath = `tests-vitest/__screenshots__/${testFilename}/${options.testName} - SVG - ${options.fontStackName}.png`;
+    const filepath = `tests/__screenshots__/${testFilename}/${options.testName} - SVG - ${options.fontStackName}.png`;
 
     const newpng = await captureSvgScreenshot(div.innerHTML, width, height);
     const oldpng = await readOrSaveScreenshot(newpng, { filepath, width, height });

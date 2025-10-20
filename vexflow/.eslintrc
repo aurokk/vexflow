@@ -58,7 +58,7 @@
     },
     {
       // Vitest test files - don't need project references
-      "files": ["tests-vitest/**/*.ts"],
+      "files": ["tests/**/*.ts"],
       "parserOptions": {
         "project": null
       },

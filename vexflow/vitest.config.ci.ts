@@ -27,7 +27,7 @@ export default defineConfig({
     globals: true,
 
     // Test file patterns
-    include: ['tests-vitest/**/*.test.ts'],
+    include: ['tests/**/*.test.ts'],
 
     // Environment variables
     env: {
@@ -38,14 +38,14 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
-      exclude: ['node_modules/', 'tests/', 'tests-vitest/', 'build/', 'reference/', 'releases/'],
+      exclude: ['node_modules/', 'tests/', 'tests/', 'build/', 'reference/', 'releases/'],
     },
 
     // Timeout for tests (music rendering can be slow)
     testTimeout: 10000,
 
     // Setup files to run before tests
-    setupFiles: ['./tests-vitest/setup.ts'],
+    setupFiles: ['./tests/setup.ts'],
 
     // Don't open UI automatically in CI
     open: false,
