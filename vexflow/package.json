@@ -64,6 +64,13 @@
     "webpack": "^5.102.1"
   },
   "description": "A JavaScript library for rendering music notation and guitar tablature.",
+  "exports": {
+    ".": {
+      "require": "./dist/cjs/entry/vexflow.js",
+      "import": "./dist/esm/entry/vexflow.js",
+      "types": "./dist/types/entry/vexflow.d.ts"
+    }
+  },
   "files": [
     "build",
     "dist",
@@ -78,13 +85,17 @@
     "tablature"
   ],
   "license": "MIT",
+  "main": "./dist/cjs/entry/vexflow.js",
+  "module": "./dist/esm/entry/vexflow.js",
+  "types": "./dist/types/entry/vexflow.d.ts",
   "name": "@aurokk/vexflow",
   "publishConfig": {
     "access": "public"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/aurokk/vexflow.git"
+    "url": "https://github.com/aurokk/vexflow.git",
+    "directory": "vexflow"
   },
   "scripts": {
     "build:dev:run": "npm-run-all build:dev:run:*",

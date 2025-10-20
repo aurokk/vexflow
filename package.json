@@ -1,6 +1,8 @@
 {
   "name": "vexflow",
+  "private": true,
   "workspaces": [
-    "vexflow"
+    "vexflow",
+    "vextab"
   ]
 }
