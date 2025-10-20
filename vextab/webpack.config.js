@@ -12,9 +12,6 @@ module.exports = (env) => {
   const gitRevisionPlugin = new GitRevisionPlugin();
 
   return {
-    node: {
-      fs: "empty",
-    },
     plugins: [
       new webpack.ProvidePlugin({
         $: "zepto-webpack",
@@ -29,10 +26,13 @@ module.exports = (env) => {
         filename: "playground.html",
         chunks: ["playground"],
       }),
-      new CopyPlugin([{ from: "static/*", flatten: true }], {
-        // Always copy (for --watch / webpack-dev-server). Needed
-        // because CleanWebpackPlugin wipes everything out.
-        copyUnmodified: true,
+      new CopyPlugin({
+        patterns: [
+          {
+            from: "static/*",
+            to: "[name][ext]",
+          },
+        ],
       }),
       new webpack.DefinePlugin({
         NODE_ENV: JSON.stringify(env.NODE_ENV),
@@ -74,7 +74,13 @@ module.exports = (env) => {
         },
         {
           test: /\.jsx?$/,
-          exclude: /node_modules/,
+          exclude: (modulePath) => {
+            // Exclude node_modules
+            if (/node_modules/.test(modulePath)) return true;
+            // Exclude local vexflow dist files
+            if (/vexflow[\/\\]dist/.test(modulePath)) return true;
+            return false;
+          },
           use: [
             { loader: "babel-loader" },
             { loader: "eslint-loader", options: { fix: true } },
@@ -87,10 +93,11 @@ module.exports = (env) => {
     resolve: {
       extensions: [".tsx", ".ts", ".js", ".jsx", ".jison"],
       alias: {
-        "@aurokk/vexflow": path.resolve(
-          __dirname,
-          "../vexflow/dist/cjs/entry/vexflow.js"
-        ),
+        "@aurokk/vexflow": path.resolve(__dirname, "../vexflow/dist/cjs/entry/vexflow.js"),
+      },
+      fallback: {
+        fs: false,
+        path: false,
       },
     },
   };
