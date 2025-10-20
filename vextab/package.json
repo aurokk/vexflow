@@ -39,7 +39,7 @@
     "typescript": "^5.9.3",
     "webpack": "^5.102.1",
     "webpack-cli": "^6.0.1",
-    "webpack-dev-server": "^3.11.3",
+    "webpack-dev-server": "^5.2.2",
     "zepto-webpack": "^1.2.1"
   },
   "keywords": [
@@ -61,7 +61,7 @@
   "scripts": {
     "build": "webpack --progress --mode production --env NODE_ENV=production --env TAG_NAME=prod --config webpack.config.js && tsc --emitDeclarationOnly",
     "build-dev": "webpack --progress --mode development --env NODE_ENV=development --env TAG_NAME=dev --config webpack.config.js && tsc --emitDeclarationOnly",
-    "start": "webpack-dev-server --progress --colors --mode development  --port 9005 --disable-host-check --env NODE_ENV=development --env TAG_NAME=dev --config webpack.config.js",
+    "start": "webpack-dev-server --progress --mode development --port 9005 --allowed-hosts all --env NODE_ENV=development --env TAG_NAME=dev --config webpack.config.js",
     "serve": "npx http-server -c 1 -p 8052",
     "watch": "webpack -w --progress --mode development --env NODE_ENV=development --env TAG_NAME=dev --config webpack.config.js",
     "clean": "rm -rf ./dist/*"
