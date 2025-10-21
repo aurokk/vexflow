@@ -43,6 +43,12 @@
     "webpack-dev-server": "^5.2.2",
     "zepto-webpack": "^1.2.1"
   },
+  "files": [
+    "build",
+    "dist",
+    "entry",
+    "src"
+  ],
   "keywords": [
     "music",
     "notation",
@@ -69,5 +75,5 @@
     "watch": "webpack -w --progress --mode development --env NODE_ENV=development --env TAG_NAME=dev --config webpack.config.ts",
     "clean": "rm -rf ./dist/*"
   },
-  "version": "1.1.3"
+  "version": "1.2.1"
 }

@@ -19,7 +19,7 @@
     "clean": "rm -rf ./dist/*"
   },
   "dependencies": {
-    "@aurokk/vextab": "^1.1.3",
+    "@aurokk/vextab": "^1.2.1",
     "lodash": "^4.17.21"
   },
   "devDependencies": {

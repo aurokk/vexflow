@@ -3,13 +3,15 @@
 ```
 root
 < vexflow
-  < vexflow playground
   < vextab
     < vextab playground
 ```
 
 ### todo
 
-- vextab playground
-- vextab vitest
-- vexflow playground
+```
++ vextab playground
+– publish new packages to ensure everything works
+– vextab vitest
+– vexflow playground
+```

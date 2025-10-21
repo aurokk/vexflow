@@ -1,5 +1,3 @@
-// const path = require("path");
-// const webpack = require("webpack");
 import HtmlWebpackPlugin from "html-webpack-plugin";
 import CopyPlugin from "copy-webpack-plugin";
 import GitRevisionPlugin from "git-revision-webpack-plugin";
