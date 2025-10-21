@@ -11,7 +11,7 @@ root
 
 ```
 + vextab playground
-– publish new packages to ensure everything works
++ publish new packages to ensure everything works
 – vextab vitest
 – vexflow playground
 ```
